@@ -1,0 +1,6 @@
+{
+  "identifyString": "ultirecipe",
+  "name": "UltiRecipe",
+  "shortDescription": "基于YAML配置的自定义合成配方插件，支持有序合成、彩色物品名、描述文本和热重载。",
+  "categoryId": 6
+}
