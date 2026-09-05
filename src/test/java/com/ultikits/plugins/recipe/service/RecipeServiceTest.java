@@ -6,14 +6,15 @@ import com.ultikits.plugins.recipe.config.RecipeConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Server;
 import org.bukkit.inventory.ItemFactory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.*;
+import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import java.util.*;
 
@@ -35,6 +36,11 @@ class RecipeServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Live test-time server: RecipeService.createOutputItem() constructs a real
+        // ItemStack, which resolves org.bukkit.Registry through Material.asItemType() —
+        // that path needs a live MockBukkit server, not just Mockito's static-method mocks.
+        MockBukkit.mock();
+
         UltiRecipeTestHelper.setUp();
 
         config = UltiRecipeTestHelper.createDefaultConfig();
@@ -50,6 +56,7 @@ class RecipeServiceTest {
     @AfterEach
     void tearDown() throws Exception {
         UltiRecipeTestHelper.tearDown();
+        MockBukkit.unmock();
     }
 
     // ==================== initRecipes ====================
@@ -85,14 +92,12 @@ class RecipeServiceTest {
             RecipeConfig configWithRecipes = UltiRecipeTestHelper.createConfigWithSampleRecipes();
             UltiRecipeTestHelper.setField(service, "config", configWithRecipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
 
@@ -382,14 +387,12 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);
 
@@ -432,14 +435,12 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);
@@ -474,14 +475,12 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);

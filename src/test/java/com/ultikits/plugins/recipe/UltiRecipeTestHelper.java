@@ -62,6 +62,12 @@ public final class UltiRecipeTestHelper {
         // Create a mock Plugin for NamespacedKey creation
         mockJavaPlugin = mock(Plugin.class);
         lenient().when(mockJavaPlugin.getName()).thenReturn("UltiTools");
+        // NamespacedKey(Plugin, String) calls Plugin.namespace() (abstract on
+        // net.kyori.adventure.key.Namespaced, which Plugin extends) — a real plugin
+        // implements it as getName().toLowerCase(Locale.ROOT). An unstubbed Mockito
+        // mock returns null here, which used to be masked by an earlier registry
+        // failure in the same call chain; stub it explicitly now that path resolves.
+        lenient().when(mockJavaPlugin.namespace()).thenReturn("ultitools");
     }
 
     /**
