@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -29,6 +30,13 @@ import static org.mockito.Mockito.*;
  * UltiToolsPlugin instances for injection into services and commands.
  * <p>
  * Call {@link #setUp()} in {@code @BeforeEach} and {@link #tearDown()} in {@code @AfterEach}.
+ * <p>
+ * <b>This is the module's shared test-time bootstrap.</b> {@link #setUp()} also starts the
+ * live {@code MockBukkit} server ({@link MockBukkit#mock()}) that {@link #tearDown()} tears
+ * back down ({@link MockBukkit#unmock()}) — every test class that needs a real
+ * {@code Bukkit.getServer()} (not just Mockito stand-ins) must go through this pair rather
+ * than calling {@code MockBukkit.mock()}/{@code unmock()} itself, so that a regression here
+ * is visible to every caller at once, including {@code UltiRecipeRegistrySentinelTest}.
  */
 @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
 public final class UltiRecipeTestHelper {
@@ -44,6 +52,11 @@ public final class UltiRecipeTestHelper {
      */
     @SuppressWarnings("unchecked")
     public static void setUp() throws Exception {
+        // Live test-time server, shared by every caller of this helper. Real ItemStack/
+        // NamespacedKey/Registry resolution (e.g. RecipeService.createOutputItem()) needs
+        // a live Bukkit.getServer(), not just Mockito's static-method mocks.
+        MockBukkit.mock();
+
         // Mock UltiRecipe (abstract UltiToolsPlugin — mockable)
         mockPlugin = mock(UltiRecipe.class);
 
@@ -77,6 +90,9 @@ public final class UltiRecipeTestHelper {
         mockPlugin = null;
         mockLogger = null;
         mockJavaPlugin = null;
+
+        // Mirror of the MockBukkit.mock() call in setUp().
+        MockBukkit.unmock();
     }
 
     public static UltiRecipe getMockPlugin() {

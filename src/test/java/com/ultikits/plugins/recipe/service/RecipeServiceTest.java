@@ -11,7 +11,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.*;
-import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -36,11 +35,10 @@ class RecipeServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Live test-time server: RecipeService.createOutputItem() constructs a real
-        // ItemStack, which resolves org.bukkit.Registry through Material.asItemType() —
-        // that path needs a live MockBukkit server, not just Mockito's static-method mocks.
-        MockBukkit.mock();
-
+        // UltiRecipeTestHelper.setUp() starts the shared live test-time server:
+        // RecipeService.createOutputItem() constructs a real ItemStack, which resolves
+        // org.bukkit.Registry through Material.asItemType() — that path needs a live
+        // MockBukkit server, not just Mockito's static-method mocks.
         UltiRecipeTestHelper.setUp();
 
         config = UltiRecipeTestHelper.createDefaultConfig();
@@ -56,7 +54,6 @@ class RecipeServiceTest {
     @AfterEach
     void tearDown() throws Exception {
         UltiRecipeTestHelper.tearDown();
-        MockBukkit.unmock();
     }
 
     // ==================== initRecipes ====================
