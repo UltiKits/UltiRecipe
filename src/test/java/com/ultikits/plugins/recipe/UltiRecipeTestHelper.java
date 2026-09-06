@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -29,6 +30,26 @@ import static org.mockito.Mockito.*;
  * UltiToolsPlugin instances for injection into services and commands.
  * <p>
  * Call {@link #setUp()} in {@code @BeforeEach} and {@link #tearDown()} in {@code @AfterEach}.
+ * <p>
+ * <b>This is the module's shared test-time bootstrap.</b> {@link #setUp()} also starts the
+ * live {@code MockBukkit} server ({@link MockBukkit#mock()}) that {@link #tearDown()} tears
+ * back down ({@link MockBukkit#unmock()}) — every test class that needs a real
+ * {@code Bukkit.getServer()} (not just Mockito stand-ins) must go through this pair rather
+ * than calling {@code MockBukkit.mock()}/{@code unmock()} itself, so that a regression here
+ * is visible to every caller at once, including {@code UltiRecipeRegistrySentinelTest}.
+ * <p>
+ * <b>Call the pair exactly once per test, from the outermost {@code @BeforeEach} and
+ * {@code @AfterEach}.</b> This helper is not re-entrant: {@link MockBukkit#mock()} throws
+ * {@code IllegalStateException("Already mocking")} when a server is already up, which is
+ * what a {@code @Nested} class that adds its own {@code setUp()} call on top of the
+ * enclosing class's would hit — JUnit runs the outer {@code @BeforeEach} first.
+ * <p>
+ * That exception is deliberately not guarded away. A guard that unmocked and re-mocked
+ * would be worse than the failure it hides: {@link #setUp()} also rebuilds
+ * {@link #getMockPlugin()} and {@link #getMockLogger()}, so anything the outer setup had
+ * already injected would go on holding the discarded mocks, and the resulting verification
+ * failures would surface far from their cause. A {@code @Nested} class inherits the
+ * enclosing class's bootstrap; it must not repeat it.
  */
 @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
 public final class UltiRecipeTestHelper {
@@ -44,6 +65,11 @@ public final class UltiRecipeTestHelper {
      */
     @SuppressWarnings("unchecked")
     public static void setUp() throws Exception {
+        // Live test-time server, shared by every caller of this helper. Real ItemStack/
+        // NamespacedKey/Registry resolution (e.g. RecipeService.createOutputItem()) needs
+        // a live Bukkit.getServer(), not just Mockito's static-method mocks.
+        MockBukkit.mock();
+
         // Mock UltiRecipe (abstract UltiToolsPlugin — mockable)
         mockPlugin = mock(UltiRecipe.class);
 
@@ -59,9 +85,16 @@ public final class UltiRecipeTestHelper {
         lenient().when(mockPlugin.getDataOperator(any()))
                 .thenReturn(mock(DataOperator.class));
 
-        // Create a mock Plugin for NamespacedKey creation
-        mockJavaPlugin = mock(Plugin.class);
-        lenient().when(mockJavaPlugin.getName()).thenReturn("UltiTools");
+        // A real plugin object for NamespacedKey creation, not a Mockito stand-in.
+        // NamespacedKey(Plugin, String) reads Plugin.namespace(), declared on
+        // net.kyori.adventure.key.Namespaced (which Plugin extends). Paper implements it
+        // one hop further out than the plugin class itself: PluginBase.namespace()
+        // delegates to PluginMeta.namespace(), whose default body is
+        // getName().toLowerCase(Locale.ROOT). PluginMock extends JavaPlugin, so that whole
+        // chain runs for real here and the namespace is always derived from the plugin
+        // name. A hand-written thenReturn("ultitools") is free to drift away from the name
+        // it is supposed to mirror, and nothing in the suite would notice.
+        mockJavaPlugin = MockBukkit.createMockPlugin("UltiTools");
     }
 
     /**
@@ -71,6 +104,9 @@ public final class UltiRecipeTestHelper {
         mockPlugin = null;
         mockLogger = null;
         mockJavaPlugin = null;
+
+        // Mirror of the MockBukkit.mock() call in setUp().
+        MockBukkit.unmock();
     }
 
     public static UltiRecipe getMockPlugin() {
@@ -82,7 +118,10 @@ public final class UltiRecipeTestHelper {
     }
 
     /**
-     * Get a mock Plugin for NamespacedKey creation.
+     * Get the plugin instance used for NamespacedKey creation.
+     * <p>
+     * This is a live {@code MockBukkit} {@code PluginMock} rather than a Mockito mock, so
+     * {@code namespace()} resolves through Paper's own implementation instead of a stub.
      */
     public static Plugin getMockJavaPlugin() {
         return mockJavaPlugin;

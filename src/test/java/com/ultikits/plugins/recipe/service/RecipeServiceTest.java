@@ -6,7 +6,6 @@ import com.ultikits.plugins.recipe.config.RecipeConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Server;
 import org.bukkit.inventory.ItemFactory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
@@ -14,6 +13,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import java.util.*;
 
@@ -26,6 +26,26 @@ import static org.mockito.Mockito.*;
  * <p>
  * Note: RecipeService uses Bukkit.addRecipe() which requires mocking Bukkit static methods.
  * The plugin instance for NamespacedKey is injected via reflection to avoid mocking UltiTools.
+ * <p>
+ * The {@code Mockito.CALLS_REAL_METHODS} default answer passed to {@code mockStatic} below is
+ * defence in depth for this class, not the thing that makes these tests pass. Measured:
+ * reverting all eight of those sites to the plain default answer leaves 75 tests and 0
+ * failures, because production {@code RecipeService} reaches only
+ * {@code Bukkit.getItemFactory()}, {@code Bukkit.addRecipe()}, {@code Bukkit.removeRecipe()}
+ * and {@code Material.matchMaterial()} — every one of them stubbed explicitly here. What
+ * actually turned this class green is the live server started by
+ * {@link UltiRecipeTestHelper#setUp()}, together with dropping the {@code Bukkit.getServer()}
+ * stubs that used to shadow it. {@code CALLS_REAL_METHODS} is kept so that a static this
+ * class does not stub — one a future change to {@code RecipeService} might start calling —
+ * runs its real implementation rather than silently answering {@code null} or {@code 0}.
+ * <p>
+ * Whether that construct is load-bearing depends on what the module under test actually
+ * calls, so do not generalise this note: in {@code UltiWorlds}, where production builds real
+ * {@code ItemStack}s, the same revert turns 17 tests red. Item construction needs a live
+ * server because {@code Material.asItemType()}'s supplier resolves a non-legacy material
+ * through {@code Registry.ITEM.get(key)} into MockBukkit's {@code RegistryMock.loadIfEmpty},
+ * which initialises Paper's {@code Tag} class, whose static initialiser calls
+ * {@code Bukkit.getTag(...)} — null without one.
  */
 @DisplayName("RecipeService Tests")
 class RecipeServiceTest {
@@ -35,6 +55,10 @@ class RecipeServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // UltiRecipeTestHelper.setUp() starts the shared live test-time server:
+        // RecipeService.createOutputItem() constructs a real ItemStack, which resolves
+        // org.bukkit.Registry through Material.asItemType() — that path needs a live
+        // MockBukkit server, not just Mockito's static-method mocks.
         UltiRecipeTestHelper.setUp();
 
         config = UltiRecipeTestHelper.createDefaultConfig();
@@ -85,14 +109,13 @@ class RecipeServiceTest {
             RecipeConfig configWithRecipes = UltiRecipeTestHelper.createConfigWithSampleRecipes();
             UltiRecipeTestHelper.setField(service, "config", configWithRecipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            // CALLS_REAL_METHODS is defence in depth, not load-bearing here — see the class javadoc.
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
 
@@ -107,6 +130,16 @@ class RecipeServiceTest {
 
                 assertThat(count).isEqualTo(1);
                 verify(UltiRecipeTestHelper.getMockLogger()).info(contains("Registered recipe"));
+
+                // Pin the NamespacedKey the service actually hands to Bukkit. Without this,
+                // the namespace half of the key is asserted nowhere: any syntactically legal
+                // lowercase string would keep the suite green, so a renamed framework plugin
+                // could silently diverge from what production builds at runtime.
+                ArgumentCaptor<ShapedRecipe> registered = ArgumentCaptor.forClass(ShapedRecipe.class);
+                bukkitMock.verify(() -> Bukkit.addRecipe(registered.capture()));
+                NamespacedKey key = registered.getValue().getKey();
+                assertThat(key.getNamespace()).isEqualTo("ultitools");
+                assertThat(key.getKey()).isEqualTo("ultirecipe_custom_diamond");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -382,14 +415,13 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            // CALLS_REAL_METHODS is defence in depth, not load-bearing here — see the class javadoc.
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);
 
@@ -432,14 +464,13 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            // CALLS_REAL_METHODS is defence in depth, not load-bearing here — see the class javadoc.
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);
@@ -474,14 +505,13 @@ class RecipeServiceTest {
 
             when(config.getRecipes()).thenReturn(recipes);
 
-            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class);
-                 MockedStatic<Material> materialMock = mockStatic(Material.class)) {
+            // CALLS_REAL_METHODS is defence in depth, not load-bearing here — see the class javadoc.
+            try (MockedStatic<Bukkit> bukkitMock = mockStatic(Bukkit.class, Mockito.CALLS_REAL_METHODS);
+                 MockedStatic<Material> materialMock = mockStatic(Material.class, Mockito.CALLS_REAL_METHODS)) {
 
-                Server server = mock(Server.class);
                 ItemFactory itemFactory = mock(ItemFactory.class);
                 ItemMeta itemMeta = mock(ItemMeta.class);
 
-                bukkitMock.when(Bukkit::getServer).thenReturn(server);
                 bukkitMock.when(Bukkit::getItemFactory).thenReturn(itemFactory);
                 bukkitMock.when(() -> Bukkit.addRecipe(any(ShapedRecipe.class))).thenReturn(true);
                 when(itemFactory.getItemMeta(any(Material.class))).thenReturn(itemMeta);

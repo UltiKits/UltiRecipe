@@ -1,0 +1,66 @@
+package com.ultikits.plugins.recipe;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+/**
+ * Reopen guard for UltiRecipe's <b>shared</b> test-time Bukkit registry bootstrap.
+ * <p>
+ * Every assertion here depends on a live server, never a bare registry constant: {@code
+ * mockbukkit-v1.21} registers its {@code RegistryAccess} mock through {@code ServiceLoader},
+ * so a bare registry constant would resolve merely from the dependency being on the classpath,
+ * independent of whether {@link org.mockbukkit.mockbukkit.MockBukkit#mock()} was ever called.
+ * <p>
+ * Deliberately, this class does <b>not</b> call {@code MockBukkit.mock()}/{@code unmock()}
+ * itself. It bootstraps through {@link UltiRecipeTestHelper#setUp()} /
+ * {@link UltiRecipeTestHelper#tearDown()} — the same shared entry point every other test class
+ * in this module goes through — so that a regression to the module's centralized bootstrap
+ * (someone rips out {@code MockBukkit.mock()} from {@code UltiRecipeTestHelper.setUp()} and
+ * re-mocks with plain Mockito instead) is caught here too, rather than only affecting the
+ * test classes that happen to construct their own independent live server. A sentinel that
+ * mocked its own server would stay green through exactly that regression.
+ */
+class UltiRecipeRegistrySentinelTest {
+
+    @BeforeEach
+    void setUp() throws Exception {
+        UltiRecipeTestHelper.setUp();
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        UltiRecipeTestHelper.tearDown();
+    }
+
+    @Test
+    void liveServerIsBootstrapped() {
+        assertNotNull(Bukkit.getServer(), "live server bootstrap must be present");
+    }
+
+    @Test
+    void unsafeValuesResolves() {
+        assertNotNull(Bukkit.getUnsafe(), "UnsafeValues must resolve on a live server");
+    }
+
+    @Test
+    void createProfileDoesNotSilentlyReturnNull() {
+        Object profile = Bukkit.createProfile(UUID.randomUUID(), "SentinelPlayer");
+        assertNotNull(profile, "createProfile must not silently return null");
+    }
+
+    @Test
+    void itemStackConstructionResolvesRegistry() {
+        ItemStack stack = new ItemStack(Material.DIAMOND);
+        assertNotNull(stack);
+        assertEquals(Material.DIAMOND, stack.getType());
+    }
+}
