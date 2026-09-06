@@ -41,8 +41,11 @@ import static org.mockito.Mockito.*;
  * <p>
  * Whether that construct is load-bearing depends on what the module under test actually
  * calls, so do not generalise this note: in {@code UltiWorlds}, where production builds real
- * {@code ItemStack}s and {@code Material.asItemType()} goes through {@code Bukkit.getUnsafe()},
- * the same revert turns 17 tests red.
+ * {@code ItemStack}s, the same revert turns 17 tests red. Item construction needs a live
+ * server because {@code Material.asItemType()}'s supplier resolves a non-legacy material
+ * through {@code Registry.ITEM.get(key)} into MockBukkit's {@code RegistryMock.loadIfEmpty},
+ * which initialises Paper's {@code Tag} class, whose static initialiser calls
+ * {@code Bukkit.getTag(...)} — null without one.
  */
 @DisplayName("RecipeService Tests")
 class RecipeServiceTest {
