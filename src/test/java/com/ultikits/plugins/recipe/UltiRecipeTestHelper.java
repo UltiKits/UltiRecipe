@@ -37,6 +37,19 @@ import static org.mockito.Mockito.*;
  * {@code Bukkit.getServer()} (not just Mockito stand-ins) must go through this pair rather
  * than calling {@code MockBukkit.mock()}/{@code unmock()} itself, so that a regression here
  * is visible to every caller at once, including {@code UltiRecipeRegistrySentinelTest}.
+ * <p>
+ * <b>Call the pair exactly once per test, from the outermost {@code @BeforeEach} and
+ * {@code @AfterEach}.</b> This helper is not re-entrant: {@link MockBukkit#mock()} throws
+ * {@code IllegalStateException("Already mocking")} when a server is already up, which is
+ * what a {@code @Nested} class that adds its own {@code setUp()} call on top of the
+ * enclosing class's would hit — JUnit runs the outer {@code @BeforeEach} first.
+ * <p>
+ * That exception is deliberately not guarded away. A guard that unmocked and re-mocked
+ * would be worse than the failure it hides: {@link #setUp()} also rebuilds
+ * {@link #getMockPlugin()} and {@link #getMockLogger()}, so anything the outer setup had
+ * already injected would go on holding the discarded mocks, and the resulting verification
+ * failures would surface far from their cause. A {@code @Nested} class inherits the
+ * enclosing class's bootstrap; it must not repeat it.
  */
 @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
 public final class UltiRecipeTestHelper {
