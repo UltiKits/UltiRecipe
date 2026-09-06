@@ -109,6 +109,16 @@ class RecipeServiceTest {
 
                 assertThat(count).isEqualTo(1);
                 verify(UltiRecipeTestHelper.getMockLogger()).info(contains("Registered recipe"));
+
+                // Pin the NamespacedKey the service actually hands to Bukkit. Without this,
+                // the namespace half of the key is asserted nowhere: any syntactically legal
+                // lowercase string would keep the suite green, so a renamed framework plugin
+                // could silently diverge from what production builds at runtime.
+                ArgumentCaptor<ShapedRecipe> registered = ArgumentCaptor.forClass(ShapedRecipe.class);
+                bukkitMock.verify(() -> Bukkit.addRecipe(registered.capture()));
+                NamespacedKey key = registered.getValue().getKey();
+                assertThat(key.getNamespace()).isEqualTo("ultitools");
+                assertThat(key.getKey()).isEqualTo("ultirecipe_custom_diamond");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

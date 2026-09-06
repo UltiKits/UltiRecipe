@@ -72,15 +72,16 @@ public final class UltiRecipeTestHelper {
         lenient().when(mockPlugin.getDataOperator(any()))
                 .thenReturn(mock(DataOperator.class));
 
-        // Create a mock Plugin for NamespacedKey creation
-        mockJavaPlugin = mock(Plugin.class);
-        lenient().when(mockJavaPlugin.getName()).thenReturn("UltiTools");
-        // NamespacedKey(Plugin, String) calls Plugin.namespace() (abstract on
-        // net.kyori.adventure.key.Namespaced, which Plugin extends) — a real plugin
-        // implements it as getName().toLowerCase(Locale.ROOT). An unstubbed Mockito
-        // mock returns null here, which used to be masked by an earlier registry
-        // failure in the same call chain; stub it explicitly now that path resolves.
-        lenient().when(mockJavaPlugin.namespace()).thenReturn("ultitools");
+        // A real plugin object for NamespacedKey creation, not a Mockito stand-in.
+        // NamespacedKey(Plugin, String) reads Plugin.namespace(), declared on
+        // net.kyori.adventure.key.Namespaced (which Plugin extends). Paper implements it
+        // one hop further out than the plugin class itself: PluginBase.namespace()
+        // delegates to PluginMeta.namespace(), whose default body is
+        // getName().toLowerCase(Locale.ROOT). PluginMock extends JavaPlugin, so that whole
+        // chain runs for real here and the namespace is always derived from the plugin
+        // name. A hand-written thenReturn("ultitools") is free to drift away from the name
+        // it is supposed to mirror, and nothing in the suite would notice.
+        mockJavaPlugin = MockBukkit.createMockPlugin("UltiTools");
     }
 
     /**
@@ -104,7 +105,10 @@ public final class UltiRecipeTestHelper {
     }
 
     /**
-     * Get a mock Plugin for NamespacedKey creation.
+     * Get the plugin instance used for NamespacedKey creation.
+     * <p>
+     * This is a live {@code MockBukkit} {@code PluginMock} rather than a Mockito mock, so
+     * {@code namespace()} resolves through Paper's own implementation instead of a stub.
      */
     public static Plugin getMockJavaPlugin() {
         return mockJavaPlugin;
