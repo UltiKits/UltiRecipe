@@ -32,7 +32,8 @@ for UAT execution and issue reconciliation — the public description of these f
   contract already captured by the `config` rows below (the in-memory `registeredRecipes` set is
   rebuilt from `recipes.yml` on every `registerSelf()`, which is expected bookkeeping, not a
   persistence guarantee distinct from the config file itself) — all eight Kinds stay in the
-  vocabulary for cross-repository consistency even though three of them appear zero times below.
+  vocabulary for cross-repository consistency even though four of them (`gui`, `scheduled`,
+  `placeholder`, `persistence`) appear zero times below.
 - **Tier**, exactly three: `player`, `admin`, `internal`. Judged from what the feature is for,
   not from whether it carries a permission string. All three of this module's commands are
   `admin` — recipe management is a server-owner activity, not something an ordinary player does,
