@@ -163,8 +163,8 @@ unloaded (`/upm uninstall UltiRecipe`, or server shutdown) or when `/ul reload U
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultirecipe.lifecycle.unload | Remove every custom recipe this module registered from Bukkit's crafting system when the module is unloaded | event | `/upm uninstall UltiRecipe`, or server shutdown (framework calls `unregisterSelf()`, which invokes this hook before its own command/listener cleanup) | n/a | n/a | admin | brief | UltiRecipe#onUnregister |
 | ultirecipe.lifecycle.reload | Re-register this module's currently-configured recipes and log the resulting count when the module is reloaded via the framework's own `/ul reload` command | event | `/ul reload UltiRecipe` (framework calls `reloadSelf()`, which runs its own steps first, then invokes this hook) | n/a | n/a | admin | brief | UltiRecipe#onReload |
+| ultirecipe.lifecycle.unload | Remove every custom recipe this module registered from Bukkit's crafting system when the module is unloaded | event | `/upm uninstall UltiRecipe`, or server shutdown (framework calls `unregisterSelf()`, which invokes this hook before its own command/listener cleanup) | n/a | n/a | admin | brief | UltiRecipe#onUnregister |
 
 ## Configuration
 
