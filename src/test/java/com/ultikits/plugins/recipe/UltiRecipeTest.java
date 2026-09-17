@@ -40,8 +40,8 @@ class UltiRecipeTest {
         }
 
         @Test
-        @DisplayName("unregisterSelf should remove recipes")
-        void unregisterSelf() throws Exception {
+        @DisplayName("onUnregister should remove recipes exactly once (UltiKits/UltiRecipe#11 Test A)")
+        void onUnregisterRemovesRecipes() throws Exception {
             UltiRecipe plugin = mock(UltiRecipe.class);
             PluginLogger logger = mock(PluginLogger.class);
             SimpleContainer context = mock(SimpleContainer.class);
@@ -51,17 +51,17 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(service);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).unregisterSelf();
+            doCallRealMethod().when(plugin).onUnregister();
 
-            plugin.unregisterSelf();
+            plugin.onUnregister();
 
-            verify(service).removeRecipes();
+            verify(service, times(1)).removeRecipes();
             verify(logger).info(contains("已禁用"));
         }
 
         @Test
-        @DisplayName("unregisterSelf should handle null service gracefully")
-        void unregisterSelfNullService() throws Exception {
+        @DisplayName("onUnregister should handle null RecipeService bean gracefully (UltiKits/UltiRecipe#11 Test C)")
+        void onUnregisterNullService() throws Exception {
             UltiRecipe plugin = mock(UltiRecipe.class);
             PluginLogger logger = mock(PluginLogger.class);
             SimpleContainer context = mock(SimpleContainer.class);
@@ -70,17 +70,17 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(null);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).unregisterSelf();
+            doCallRealMethod().when(plugin).onUnregister();
 
             // Should not throw exception
-            plugin.unregisterSelf();
+            plugin.onUnregister();
 
             verify(logger).info(contains("已禁用"));
         }
 
         @Test
-        @DisplayName("reloadSelf should reload recipes")
-        void reloadSelf() throws Exception {
+        @DisplayName("onReload should reload recipes exactly once and log the returned count (UltiKits/UltiRecipe#11 Test B)")
+        void onReloadReloadsRecipesAndLogsCount() throws Exception {
             UltiRecipe plugin = mock(UltiRecipe.class);
             PluginLogger logger = mock(PluginLogger.class);
             SimpleContainer context = mock(SimpleContainer.class);
@@ -91,18 +91,18 @@ class UltiRecipeTest {
             when(context.getBean(RecipeService.class)).thenReturn(service);
             when(service.reloadRecipes()).thenReturn(8);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).reloadSelf();
+            doCallRealMethod().when(plugin).onReload();
 
-            plugin.reloadSelf();
+            plugin.onReload();
 
-            verify(service).reloadRecipes();
+            verify(service, times(1)).reloadRecipes();
             verify(logger).info(contains("配方已重载"));
             verify(logger).info(contains("8"));
         }
 
         @Test
-        @DisplayName("reloadSelf should handle null service gracefully")
-        void reloadSelfNullService() throws Exception {
+        @DisplayName("onReload should handle null RecipeService bean gracefully (UltiKits/UltiRecipe#11 Test C)")
+        void onReloadNullService() throws Exception {
             UltiRecipe plugin = mock(UltiRecipe.class);
             PluginLogger logger = mock(PluginLogger.class);
             SimpleContainer context = mock(SimpleContainer.class);
@@ -111,10 +111,10 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(null);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).reloadSelf();
+            doCallRealMethod().when(plugin).onReload();
 
             // Should not throw exception
-            plugin.reloadSelf();
+            plugin.onReload();
 
             verify(logger, never()).info(contains("配方已重载"));
         }
