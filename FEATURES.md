@@ -131,9 +131,11 @@ system, independent of whether an operator can query it through a command.
 
 **Fixed by `UltiKits/UltiRecipe#11`'s wave-0 lifecycle-hook migration (this pull request).**
 Before this migration, `UltiRecipe` overrode `UltiToolsPlugin#reloadSelf()`/`#unregisterSelf()`
-directly, completely replacing the framework's own steps (`ConfigManager#reloadConfigs`, the
-module's `language` object, `ConditionalRegistrationEvaluator`'s drift report, and the
-framework's own per-module reload log line never ran for this module). As of 6.3.0,
+directly without calling `super`, completely replacing the framework's own steps: on reload,
+`ConfigManager#reloadConfigs` and the module's `language` object refresh never ran for this module;
+on unload, command unregistration was skipped on every path (`/upm uninstall UltiRecipe` and server
+shutdown), and listener unregistration on `/upm uninstall` (server shutdown already removed
+listeners itself; this module registers none either way). As of 6.3.0,
 `reloadSelf()`/`unregisterSelf()` are `final` template methods on `UltiToolsPlugin`; this module
 now overrides the extension-point hooks `onReload()`/`onUnregister()` instead, with the same
 bodies moved verbatim. `/ul reload UltiRecipe` (the framework's own command, not a
@@ -143,9 +145,11 @@ bodies moved verbatim. `/ul reload UltiRecipe` (the framework's own command, not
 module's `language` object refresh, `ConditionalRegistrationEvaluator`'s drift report for either
 of this module's two gates above, the framework's own `Module 'UltiRecipe' reloaded.` INFO line,
 and finally `onReload()` — which re-registers this module's recipes and logs its own count line,
-exactly as before. Unloading the module (`unregisterSelf()`) now similarly runs `onUnregister()`
-(removing every custom recipe, as before) followed by the framework's own command and listener
-cleanup for this module, which previously never ran for `UltiRecipe` at all. See the two new
+exactly as before. (The drift report and the `Module 'UltiRecipe' reloaded.` line are new in
+UltiTools 6.3.0; they did not exist in 6.2.5.) Unloading the module (`/upm uninstall UltiRecipe`
+or server shutdown, both of which call `unregisterSelf()`) now runs `onUnregister()` (removing
+every custom recipe, as before) followed by the framework's own command unregistration and then
+listener unregistration for this module. See the two new
 `ultirecipe.lifecycle.*` rows below for the hooks themselves.
 
 ## Lifecycle Hooks
@@ -154,12 +158,12 @@ cleanup for this module, which previously never ran for `UltiRecipe` at all. See
 `UltiToolsPlugin#unregisterSelf()`/`#reloadSelf()` invoke (see `## Reload Behaviour Outside
 /recipe` above for the full sequencing). Neither hook is reachable through a command this
 repository maps itself — both are always invoked by the framework, either when the module is
-unloaded/disabled or when `/ul reload UltiRecipe` runs — so both rows below are `event`-Kind, not
+unloaded (`/upm uninstall UltiRecipe`, or server shutdown) or when `/ul reload UltiRecipe` runs — so both rows below are `event`-Kind, not
 `command`-Kind.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultirecipe.lifecycle.unload | Remove every custom recipe this module registered from Bukkit's crafting system when the module is unloaded or disabled | event | Unload/disable the `UltiRecipe` module (framework calls `unregisterSelf()`, which invokes this hook before its own command/listener cleanup) | n/a | n/a | admin | brief | UltiRecipe#onUnregister |
+| ultirecipe.lifecycle.unload | Remove every custom recipe this module registered from Bukkit's crafting system when the module is unloaded | event | `/upm uninstall UltiRecipe`, or server shutdown (framework calls `unregisterSelf()`, which invokes this hook before its own command/listener cleanup) | n/a | n/a | admin | brief | UltiRecipe#onUnregister |
 | ultirecipe.lifecycle.reload | Re-register this module's currently-configured recipes and log the resulting count when the module is reloaded via the framework's own `/ul reload` command | event | `/ul reload UltiRecipe` (framework calls `reloadSelf()`, which runs its own steps first, then invokes this hook) | n/a | n/a | admin | brief | UltiRecipe#onReload |
 
 ## Configuration
