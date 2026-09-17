@@ -68,6 +68,19 @@ for real-machine verification, not user-facing documentation.
 | ultirecipe.recipe.service-gate | `enabled: true` in `config/recipes.yml` (shipped default); at least one recipe configured in `recipes.yml` before the restart | Restart the server, then attempt to craft the configured recipe's shape in a crafting table | The configured output item appears in the result slot — `RecipeService` registered the recipe with Bukkit at boot because `enabled` was `true` at component-scan time | server | |
 | ultirecipe.recipe.service-gate.neg-disabled | `enabled: false` in `config/recipes.yml`, set BEFORE the restart below, with at least one recipe still configured in `recipes.yml` (its presence in the file is irrelevant once the gate is off) | Restart the server, then attempt to craft the same shape in a crafting table | No custom output appears — the shape yields nothing (or whatever vanilla recipe happens to share the shape, if any), because `RecipeService` itself was never created as a bean, so no custom `ShapedRecipe` was ever registered with Bukkit regardless of what `recipes.yml` still contains | server | |
 
+## Lifecycle Hooks
+
+Both rows below exercise `UltiKits/UltiRecipe#11`'s wave-0 lifecycle-hook migration:
+`unregisterSelf()`/`reloadSelf()` are now `final` framework template methods, and this module's
+own cleanup/reload work moved verbatim into the `onUnregister()`/`onReload()` extension-point
+hooks those template methods invoke. See `FEATURES.md`'s `## Lifecycle Hooks` and
+`## Reload Behaviour Outside /recipe` sections for the full sequencing.
+
+| ID | Preconditions | Steps | Expected | Layer | Covers |
+|---|---|---|---|---|---|
+| ultirecipe.lifecycle.unload | `language: en` in config.yml; module loaded with at least one custom recipe registered (see `ultirecipe.recipe.count`'s precondition). Currently BLOCKED from execution entirely by `UltiKits/UltiRecipe#16` (any `recipes.yml` whose `recipes` map has at least one entry crashes module load with a `ClassCastException` — the shipped empty-map default (`recipes: {}`) loads fine) — this precondition cannot be established on the current build until #16 is fixed (wave 1); the wave-0 session is expected to record this row `blocked` on that issue, and the wave-1 session re-runs it once #16 lands. | Unload or disable the `UltiRecipe` module (e.g. via a plugin manager's unload/disable command, or a full server stop with the module still installed), then, with the module unloaded, attempt to craft the previously-registered recipe's shape in a crafting table | The crafting result slot is empty for that shape — the previously-registered custom recipe no longer exists in Bukkit's crafting registry, because `RecipeService#removeRecipes()` was called from `onUnregister()`, which the framework's own (now-final) `unregisterSelf()` invokes before its own command/listener cleanup for this module | server | |
+| ultirecipe.lifecycle.reload | `language: en` in config.yml; module loaded with at least one custom recipe registered — same precondition as `ultirecipe.lifecycle.unload` above, and equally BLOCKED by `UltiKits/UltiRecipe#16` until wave 1; this row is expected to record `blocked` in the wave-0 session and be re-run once #16 lands. | Run `/ul reload UltiRecipe` through the framework's own reload command | Console shows the framework's own per-module reload line `Module 'UltiRecipe' reloaded.` immediately followed by this module's own count line `Recipes reloaded, <n> recipes total` for the current recipe count — proving `reloadSelf()`'s final template method ran its own steps (config reload, language refresh, `@ConditionalOnConfig` drift report, then the framework's per-module line) before invoking `onReload()`, which re-registers the module's recipes | server | |
+
 ## Configuration
 
 One row for the module's single shipped yml file (D-06's config-per-file rule), covering both
