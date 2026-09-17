@@ -133,9 +133,10 @@ system, independent of whether an operator can query it through a command.
 Before this migration, `UltiRecipe` overrode `UltiToolsPlugin#reloadSelf()`/`#unregisterSelf()`
 directly without calling `super`, completely replacing the framework's own steps: on reload,
 `ConfigManager#reloadConfigs` and the module's `language` object refresh never ran for this module;
-on unload, command unregistration was skipped on every path (`/upm uninstall UltiRecipe` and server
-shutdown), and listener unregistration on `/upm uninstall` (server shutdown already removed
-listeners itself; this module registers none either way). As of 6.3.0,
+on `/upm uninstall UltiRecipe`, command and listener unregistration were both skipped, so the
+`/recipe` command stayed registered until the server restarted (this module registers no
+listeners). Server shutdown was unaffected: there the framework unregistered listeners and commands
+itself. As of 6.3.0,
 `reloadSelf()`/`unregisterSelf()` are `final` template methods on `UltiToolsPlugin`; this module
 now overrides the extension-point hooks `onReload()`/`onUnregister()` instead, with the same
 bodies moved verbatim. `/ul reload UltiRecipe` (the framework's own command, not a
