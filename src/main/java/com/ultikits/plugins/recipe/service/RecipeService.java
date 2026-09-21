@@ -74,18 +74,34 @@ public class RecipeService {
      * @return the number of recipes registered
      */
     public int initRecipes() {
-        Map<String, RecipeConfig.RecipeDefinition> recipes = config.getRecipes();
-        
+        // Read through a wildcard view. The declared value type is RecipeDefinition, but the
+        // framework's own binder (DefaultConfigParser#parse) fills this map with LinkedHashMaps,
+        // so reading a value back AS a RecipeDefinition compiles to a checkcast that throws
+        // ClassCastException for every non-empty recipes.yml (UltiKits/UltiRecipe#16). The
+        // wildcard keeps every value at Object until it is bound explicitly below.
+        Map<String, ?> recipes = config.getRecipes();
+
         if (recipes == null || recipes.isEmpty()) {
             getLogger().info("No custom recipes configured");
             return 0;
         }
 
         int count = 0;
-        for (Map.Entry<String, RecipeConfig.RecipeDefinition> entry : recipes.entrySet()) {
+        for (Map.Entry<String, ?> entry : recipes.entrySet()) {
             String recipeName = entry.getKey();
-            RecipeConfig.RecipeDefinition definition = entry.getValue();
-            
+
+            // Binding and registration are caught separately and on purpose: a value whose
+            // SHAPE is wrong never reaches registration, and a recipe that is shaped correctly
+            // but cannot be registered (an unusable name, for example) still reports through
+            // the message it always did.
+            RecipeConfig.RecipeDefinition definition;
+            try {
+                definition = RecipeConfig.RecipeDefinition.fromConfigValue(entry.getValue());
+            } catch (IllegalArgumentException e) {
+                getLogger().warn("Skipped recipe '" + recipeName + "': " + e.getMessage());
+                continue;
+            }
+
             try {
                 if (registerRecipe(recipeName, definition)) {
                     count++;
