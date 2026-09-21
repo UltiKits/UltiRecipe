@@ -101,7 +101,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * "Nothing usable" means an empty mapping or list, and for {@code output} it means a
          * block carrying no {@code material}. Note that Bukkit DROPS a mapping key whose value
          * is empty, so {@code ingredients:} with only {@code D:} under it arrives here as an
-         * empty mapping; "empty" and "absent" therefore bind alike. The decision about what to do with that null is not made here.
+         * empty mapping; "empty" and "absent" therefore bind alike. The decision about what
+         * to do with that null is not made here.
          * <p>
          * Which sub-key values bind to null, and which do not. One row per case, each
          * independently checkable against the measurement named beside it; the artefacts are in
@@ -111,8 +112,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * ----------------------------   ---------  -----------------------   -----------------------
          * ingredients: absent or empty   null       Invalid recipe            RecipeYamlLoadTest
          * shape:       absent or empty   null       definition for: &lt;name&gt;    $RequiredKeyAbsent
-         * output:      absent, {}, or               (all three cases)
-         *              no material       null
+         * output:      absent, {}, or               (all three cases)         (each case has its
+         *              no material       null                                  own test there)
          *
          * material: ""                   itself     Invalid output material   emptyMaterialString-
          * material: NOT_A_MATERIAL       itself     for recipe: &lt;name&gt;        KeepsTheSpecificMessage,
@@ -132,8 +133,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * shape absent/empty        Recipe shape must have exactly 3 rows            MUTATION-shape-
          *                           for: &lt;name&gt;                                     absent-keeps-the-
          *                                                                           default
-         * output empty/no material  Failed to register recipe: &lt;name&gt; -             MUTATION-output-with-
-         *                           Name cannot be null                             no-material-kept
+         * output empty/no material  Failed to register recipe: &lt;name&gt; -    MUTATION-output-
+         *                           Name cannot be null                     with-no-material-kept
          * </pre>
          * <p>
          * Why the {@code ingredients} row of that second table says what it says. Measured
@@ -149,11 +150,15 @@ public class RecipeConfig extends AbstractConfigEntity {
          * "DDD" x3, all undefined       "   " x3     throws ArrayIndexOutOf-       case B
          *                                            BoundsException: Index 0
          *                                            out of bounds for length 0
-         * "DDD" x3, D defined           unchanged    accepts, width 3, height 3    control
+         * "DDD" x3, D defined           not run      accepts, width 3, height 3    control
+         *                                (fed direct)
          * </pre>
          * MockBukkit cannot observe any of that: its {@code ServerMock#addRecipe} stores the
-         * object and never reaches that code. Two earlier revisions of this javadoc were measured
-         * there and stated as server behaviour.
+         * object and never reaches that code. Two earlier revisions of this paragraph were wrong
+         * here, for different reasons - {@code 485d016} stated a MockBukkit observation as server
+         * behaviour, and {@code c1c0cae} applied a real Paper measurement to a case it had not
+         * been taken on. Neither is a count of anything; both are checkable with
+         * {@code git show <sha>:src/main/java/.../RecipeConfig.java}.
          *
          * @param value the parsed configuration value, or an already-built definition
          * @return the bound definition
@@ -172,7 +177,7 @@ public class RecipeConfig extends AbstractConfigEntity {
             // situation reports differently depending on which side it came from. One row per
             // case; the third row is what happens when BOTH fields deviate, which the first two
             // rows do not cover - createOutputItem runs before the shape check
-            // (RecipeService:127-139), so only the material message appears:
+            // (RecipeService:132 and :144 respectively), so only the material message appears:
             //
             //   hand-built definition          reports
             //   ----------------------------   --------------------------------------------
