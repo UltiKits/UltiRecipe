@@ -403,8 +403,9 @@ class RecipeYamlLoadTest {
          * MockBukkit row as server behaviour.
          *
          * <p>`registerRecipe` has always refused a definition whose output, shape or ingredients
-         * is null. The binder must therefore hand it null when the operator supplied nothing,
-         * rather than the field's own non-null default, or that guard cannot fire.
+         * is null. The binder therefore hands it null when the operator supplied nothing; the
+         * field's own non-null default is not used for those cases, because that guard reads
+         * null and nothing else.
          */
         private void assertRefusedWithoutRegistering(String key) {
             assertThat(service.initRecipes()).isZero();
@@ -531,11 +532,10 @@ class RecipeYamlLoadTest {
         }
 
         /**
-         * The boundary of "nothing usable". A material that is present but unusable is NOT folded
-         * into this guard, deliberately: `material: ""` and `material: NOT_A_MATERIAL` both already
-         * produce `Invalid output material for recipe: <name>`, which names the offending sub-key,
-         * and routing them through the null guard would replace that with the vaguer
-         * `Invalid recipe definition`. Measured, not assumed - both were run against this binder.
+         * The boundary of "nothing usable": a material that is present but unusable is not folded
+         * into the null guard. Both `material: ""` and `material: NOT_A_MATERIAL` produce
+         * `Invalid output material for recipe: <name>`, which names the offending sub-key. Each
+         * is pinned by its own test here, so the boundary cannot move without one going red.
          */
         @Test
         @DisplayName("an empty material string keeps that message too - the other shape the boundary defends")
@@ -668,6 +668,12 @@ class RecipeYamlLoadTest {
     @DisplayName("known defect UltiKits/UltiRecipe#21 - an unusable ingredient still registers")
     class UnusableIngredientStillRegisters {
 
+        /**
+         * This fixture is the FIRST row of the table on this class: `S` is unusable but `D` is
+         * defined, so part of the shape survives the substitution. On Paper 1.21.11 it registers
+         * as `D D` x3 at width 3, height 3. The registration asserted below is MockBukkit's
+         * store-and-return, which is the same verdict here for a different reason.
+         */
         @Test
         @DisplayName("an unknown ingredient material is warned about, skipped, and the recipe registers without it")
         void unknownIngredientMaterialStillRegisters() throws Exception {
