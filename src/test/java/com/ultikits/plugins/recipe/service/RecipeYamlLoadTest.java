@@ -378,29 +378,29 @@ class RecipeYamlLoadTest {
     class RequiredKeyAbsent {
 
         /**
-         * <b>What this harness sees, and what a real server does - they differ here, so read
-         * both.</b> An earlier revision of this paragraph stated the MockBukkit observation as
-         * unqualified real-server fact, twice, and was wrong both times. The rule this class
-         * exists to serve applies to its own javadoc: state the instrument with the claim.
+         * The two instruments disagree for this fixture, so each is stated with its own
+         * observation. One row per instrument; artefacts in
+         * `revert-proofs/w1/UltiRecipe-16-scripts/`.
          *
-         * <p>On MockBukkit, which is what the tests below assert: before the fix an entry with
-         * no `ingredients` registered, logged `Registered recipe: <name>` at INFO and appeared
-         * in `/recipe list`, with no warning at all. `ServerMock#addRecipe` null-checks and
-         * stores; it never reaches `CraftShapedRecipe#addToCraftingManager`.
+         * <pre>
+         * instrument         before the fix, entry with no `ingredients`       measured by
+         * ----------------   ---------------------------------------------     ----------------
+         * MockBukkit         registers; logs `Registered recipe: &lt;name&gt;`;       the tests below,
+         * (what the tests    appears in `/recipe list`; no warn call            before `485d016`
+         * below assert)
          *
-         * <p>On Paper 1.21.11, measured by bootstrapping the server jar and calling its own
-         * classes: `replaceUndefinedIngredientsWithEmpty` turns every undefined shape character
-         * into a space, so this entry's pattern is entirely blank, and `ShapedRecipePattern.of`
-         * then THROWS `ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0`.
-         * `CraftServer#addRecipe` has no exception table around `addToCraftingManager`, so it
-         * reaches `initRecipes`'s catch and the operator reads
-         * `Failed to register recipe: <name> - Index 0 out of bounds for length 0`. It does not
-         * register there either - it fails opaquely, in a line that reads like a framework crash
-         * rather than a configuration mistake.
+         * Paper 1.21.11      `ShapedRecipePattern.of` throws                    paper-1.21.11-
+         *                    `ArrayIndexOutOfBoundsException: Index 0 out       probe.out, case B
+         *                    of bounds for length 0`; reaches
+         *                    `initRecipes`'s catch; the operator reads
+         *                    `Failed to register recipe: &lt;name&gt; - Index 0
+         *                    out of bounds for length 0`; does not register
+         * </pre>
          *
-         * <p>So the fix is worth making on both instruments, for different reasons: it replaces
-         * a silent false success here, and an unreadable failure there. Neither half may be
-         * restated from the other.
+         * `ServerMock#addRecipe` null-checks and stores; it never reaches
+         * `CraftShapedRecipe#addToCraftingManager`, which is where the Paper row happens. Neither
+         * row may be restated from the other - two earlier revisions of this javadoc stated the
+         * MockBukkit row as server behaviour.
          *
          * <p>`registerRecipe` has always refused a definition whose output, shape or ingredients
          * is null. The binder must therefore hand it null when the operator supplied nothing,
@@ -641,18 +641,28 @@ class RecipeYamlLoadTest {
      * without a test nothing in the tree says that "warn, skip the ingredient, register anyway" is
      * the contract today.
      *
-     * <p><b>What this harness can and cannot see.</b> MockBukkit's `ServerMock#addRecipe` is a
-     * store - it null-checks and keeps the object - so what is asserted below is what the module
-     * handed over. It never reaches `CraftShapedRecipe#addToCraftingManager`, so it cannot observe
-     * what a real server then does with it. Read out of Paper 1.21.11's own bytecode
-     * (`replaceUndefinedIngredientsWithEmpty`): every shape character with no ingredient is
-     * replaced by a space. So on a real server this entry does not become an uncraftable recipe -
-     * it becomes `D D` / `D D` / `D D`, which `ShapedRecipePattern.of` accepts at width 3,
-     * height 3 (measured against the bootstrapped server jar): a DIFFERENT and perfectly
-     * craftable recipe, over the SAME 3x3 grid, not a smaller one. That holds only because part
-     * of the shape is still defined - see `multiCharacterIngredientKeyStillRegisters` for the
-     * case where none of it is, which throws instead. Do not restate either consequence from
-     * this test; both are recorded in #21, measured against the server jar.
+     * <p><b>What this harness can and cannot see.</b> MockBukkit's `ServerMock#addRecipe`
+     * null-checks and stores, so what the tests below assert is what the module handed over. It
+     * never reaches `CraftShapedRecipe#addToCraftingManager`, so it observes nothing of the rows
+     * below, which were measured against a bootstrapped Paper 1.21.11
+     * (`paper-1.21.11-probe.out`). One row per case:
+     *
+     * <pre>
+     * case                              on Paper 1.21.11                        probe row
+     * -------------------------------   -------------------------------------   ---------
+     * `DSD` x3, `S` unusable            registers as `D D` x3, accepted at      case A
+     *   (part of the shape defined)     width 3, height 3; craftable
+     *   -> unknownIngredientMaterial-
+     *      StillRegisters
+     *
+     * `DDD` x3, key `DD` unusable       `ShapedRecipePattern.of` throws          case B
+     *   (nothing defined)               `ArrayIndexOutOfBoundsException:
+     *   -> multiCharacterIngredient-    Index 0 out of bounds for length 0`;
+     *      KeyStillRegisters            does not register
+     * </pre>
+     *
+     * Each test below names its own row. Do not quote one for the other; both are recorded in
+     * #21 with the same measurement.
      */
     @Nested
     @DisplayName("known defect UltiKits/UltiRecipe#21 - an unusable ingredient still registers")
@@ -694,15 +704,10 @@ class RecipeYamlLoadTest {
          * defect, same issue: the key is rejected, no ingredient is set at all, and on this
          * harness the recipe registers regardless.
          *
-         * <p><b>This case is the TOTAL one, so the note above does not transfer to it.</b> That
-         * note describes a partially defined shape, where the substitution leaves a different
-         * but valid pattern. Here NOTHING is defined, so every character becomes a space and the
-         * pattern is entirely blank - measured against Paper 1.21.11, `ShapedRecipePattern.of`
-         * throws `ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0` for that,
-         * so on a real server this entry does not register at all and the operator reads
-         * `Failed to register recipe: wide_key - Index 0 out of bounds for length 0`. The
-         * registration asserted below is a MockBukkit artefact, and `UltiKits/UltiRecipe#21`
-         * records both branches separately for that reason.
+         * <p>This fixture is the second row of the table on this class: nothing in the shape is
+         * defined, so on Paper 1.21.11 `ShapedRecipePattern.of` throws and the entry does not
+         * register there. The registration asserted below is what MockBukkit's store-and-return
+         * `addRecipe` produces.
          */
         @Test
         @DisplayName("a multi-character ingredient key is warned about, skipped, and the recipe registers with no ingredients at all")
