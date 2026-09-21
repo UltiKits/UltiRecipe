@@ -1,0 +1,404 @@
+package com.ultikits.plugins.recipe.service;
+
+import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
+import com.ultikits.plugins.recipe.config.RecipeConfig;
+import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
+import com.ultikits.ultitools.interfaces.impl.pasers.DefaultConfigParser;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.Recipe;
+import org.bukkit.inventory.ShapedRecipe;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Loading a real, non-empty {@code recipes.yml} (UltiKits/UltiRecipe#16).
+ *
+ * <p>Every case here feeds {@code RecipeService} the value the FRAMEWORK actually produces for
+ * the {@code recipes} key, by running the same two steps the framework runs:
+ * {@code YamlConfiguration.loadFromString(...)} and then
+ * {@link DefaultConfigParser#parse(Object)}. That parser turns every nested YAML mapping into a
+ * {@code LinkedHashMap} and never into the declared {@code RecipeDefinition} value type, so the
+ * declared {@code Map<String, RecipeDefinition>} field holds maps at runtime. This is the
+ * distinction that matters: {@code RecipeServiceTest} builds its fixtures by calling
+ * {@code new RecipeDefinition()} and the setters, which is a shape no server ever produces, and
+ * that is why the whole class stayed green while no operator could load a single custom recipe.
+ *
+ * <p>The class deliberately touches nothing but {@code RecipeService}'s own public surface, so it
+ * compiles unchanged against the pre-fix sources and the revert proof's RED is a real test
+ * failure rather than a compilation error.
+ *
+ * <p>No Bukkit static is stubbed. {@code Material.matchMaterial} and {@code Bukkit.addRecipe} run
+ * for real against the live test server {@link UltiRecipeTestHelper#setUp()} starts, and the
+ * registered recipe is read back out of that server's own registry. An assertion that only
+ * counted registrations could pass while the output item was built from nothing; reading the
+ * result item back is what makes that impossible.
+ */
+@DisplayName("RecipeService — loading a real recipes.yml (UltiKits/UltiRecipe#16)")
+class RecipeYamlLoadTest {
+
+    /** The legal mixed-case entry from the issue body. */
+    private static final String LEGAL_SWORD =
+            "recipes:\n"
+            + "  Custom_Sword:\n"
+            + "    output:\n"
+            + "      material: DIAMOND_SWORD\n"
+            + "      amount: 1\n"
+            + "      name: \"&bHoly Blade\"\n"
+            + "      lore:\n"
+            + "        - \"&7A mighty sword\"\n"
+            + "    shape:\n"
+            + "      - \" D \"\n"
+            + "      - \" D \"\n"
+            + "      - \" S \"\n"
+            + "    ingredients:\n"
+            + "      D: DIAMOND\n"
+            + "      S: STICK\n";
+
+    private RecipeService service;
+    private RecipeConfig config;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        UltiRecipeTestHelper.setUp();
+        config = UltiRecipeTestHelper.createDefaultConfig();
+        service = new RecipeService();
+        UltiRecipeTestHelper.setField(service, "plugin", UltiRecipeTestHelper.getMockPlugin());
+        UltiRecipeTestHelper.setField(service, "config", config);
+        UltiRecipeTestHelper.setField(service, "pluginInstance", UltiRecipeTestHelper.getMockJavaPlugin());
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        UltiRecipeTestHelper.tearDown();
+    }
+
+    /**
+     * Java 8 forbids a static member on an inner class, and a {@code @Nested} class is one, so
+     * this provider lives on the enclosing class and is cited by its fully qualified name.
+     */
+    static Stream<Arguments> unbindableEntries() {
+        return Stream.of(
+                Arguments.of("a scalar where a mapping belongs",
+                        "recipes:\n  e: hello\n",
+                        "Skipped recipe 'e': expected a mapping, found the text 'hello'"),
+                Arguments.of("a number where a mapping belongs",
+                        "recipes:\n  e: 7\n",
+                        "Skipped recipe 'e': expected a mapping, found a number"),
+                Arguments.of("a boolean where a mapping belongs",
+                        "recipes:\n  e: true\n",
+                        "Skipped recipe 'e': expected a mapping, found a true/false value"),
+                Arguments.of("a list where a mapping belongs",
+                        "recipes:\n  e:\n    - one\n    - two\n",
+                        "Skipped recipe 'e': expected a mapping, found a list"),
+                Arguments.of("output that is not a mapping",
+                        "recipes:\n  e:\n    output: DIAMOND\n",
+                        "Skipped recipe 'e': output: expected a mapping, found the text 'DIAMOND'"),
+                Arguments.of("output.amount that is not a number",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n      amount: lots\n",
+                        "Skipped recipe 'e': output.amount: expected a number, found the text 'lots'"),
+                Arguments.of("output.lore that is not a list",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n      lore: a line\n",
+                        "Skipped recipe 'e': output.lore: expected a list, found the text 'a line'"),
+                Arguments.of("shape that is not a list",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    shape: DDD\n",
+                        "Skipped recipe 'e': shape: expected a list, found the text 'DDD'"),
+                Arguments.of("a shape row that is empty",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    shape:\n      - \"DDD\"\n      -\n",
+                        "Skipped recipe 'e': shape: contains an empty entry"),
+                Arguments.of("ingredients that is not a mapping",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients: D\n",
+                        "Skipped recipe 'e': ingredients: expected a mapping, found the text 'D'"),
+                Arguments.of("an ingredient with no material",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients:\n      D:\n",
+                        "Skipped recipe 'e': ingredients.D: has no value"));
+    }
+
+    // --- fixtures -------------------------------------------------------------------------
+
+    /**
+     * Binds a {@code recipes.yml} body the way the framework does, and hands the result to the
+     * config bean. The unchecked cast is the point of this class, not an oversight: it reproduces
+     * the heap pollution the framework's own binder creates on every server.
+     */
+    @SuppressWarnings("unchecked")
+    private void givenRecipesYml(String yml) throws Exception {
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.loadFromString(yml);
+        Object raw = yaml.get("recipes");
+        Object parsed = raw == null
+                ? new LinkedHashMap<String, Object>()
+                : new DefaultConfigParser().parse(raw);
+        assertThat(parsed).as("the framework binds recipes to a plain Map, not to RecipeDefinition")
+                .isInstanceOf(Map.class);
+        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) parsed);
+    }
+
+    /** Hands the config bean a map built in code rather than parsed from YAML. */
+    @SuppressWarnings("unchecked")
+    private void givenRecipesMap(Map<String, ?> recipes) {
+        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) recipes);
+    }
+
+    private List<String> warnings() {
+        PluginLogger logger = UltiRecipeTestHelper.getMockLogger();
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(logger, org.mockito.Mockito.atLeast(0)).warn(captor.capture());
+        return captor.getAllValues();
+    }
+
+    private ShapedRecipe registered(String key) {
+        Recipe recipe = Bukkit.getRecipe(
+                new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(), "ultirecipe_" + key));
+        assertThat(recipe).as("recipe '%s' in the server's own registry", key).isNotNull();
+        return (ShapedRecipe) recipe;
+    }
+
+    // --- the four shapes from the issue body ---------------------------------------------
+
+    @Nested
+    @DisplayName("the four recipe shapes UltiRecipe#16 was reproduced with")
+    class TheFourShapes {
+
+        @Test
+        @DisplayName("1 — a legal mixed-case entry registers, with its output item fully bound")
+        void legalEntryRegisters() throws Exception {
+            givenRecipesYml(LEGAL_SWORD);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+
+            assertThat(service.getRecipeList()).containsExactly("custom_sword");
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).warn(anyString());
+
+            ShapedRecipe recipe = registered("custom_sword");
+            assertThat(recipe.getShape()).containsExactly(" D ", " D ", " S ");
+            assertThat(recipe.getIngredientMap().get('D').getType()).isEqualTo(Material.DIAMOND);
+            assertThat(recipe.getIngredientMap().get('S').getType()).isEqualTo(Material.STICK);
+
+            ItemStack result = recipe.getResult();
+            assertThat(result.getType()).isEqualTo(Material.DIAMOND_SWORD);
+            assertThat(result.getAmount()).isEqualTo(1);
+            assertThat(result.getItemMeta().getDisplayName()).isEqualTo("\u00a7bHoly Blade");
+            assertThat(result.getItemMeta().getLore()).containsExactly("\u00a77A mighty sword");
+        }
+
+        @Test
+        @DisplayName("2 — output.amount 100 registers unclamped (the declared @Range is #14, not this fix)")
+        void amountAboveTheDeclaredRangeRegisters() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  big_stack:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "      amount: 100\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(registered("big_stack").getResult().getAmount()).isEqualTo(100);
+        }
+
+        @Test
+        @DisplayName("3 — a 2-row shape is skipped by the row-count check that already existed")
+        void twoRowShapeIsSkipped() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  two_rows:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DD\"\n"
+                    + "      - \"DD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            assertThat(warnings()).containsExactly("Recipe shape must have exactly 3 rows for: two_rows");
+        }
+
+        @Test
+        @DisplayName("4 — a name with a space is skipped, keeping the existing registration-failure wording")
+        void nameWithASpaceIsSkipped() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  bad name:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            // The literal `ultirecipe.config.recipes-yml` asserts verbatim. A recipe whose SHAPE
+            // binds but which cannot be registered must keep reporting through this message, not
+            // through the binding message below.
+            assertThat(warnings()).hasSize(1);
+            assertThat(warnings().get(0)).startsWith("Failed to register recipe: bad name - ");
+        }
+    }
+
+    // --- one bad entry never costs the good ones -----------------------------------------
+
+    @Nested
+    @DisplayName("a malformed entry is skipped without taking the file down")
+    class PartialFailure {
+
+        @Test
+        @DisplayName("a malformed entry beside a valid one yields one registration and one warning")
+        void malformedEntryBesideAValidOne() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  broken: not a mapping\n"
+                    + "  good:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings())
+                    .containsExactly("Skipped recipe 'broken': expected a mapping, found the text 'not a mapping'");
+        }
+
+        @Test
+        @DisplayName("the whole file still loads when EVERY entry is malformed")
+        void everyEntryMalformed() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  a: 1\n"
+                    + "  b: 2\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("an empty recipes map registers nothing and warns about nothing")
+        void emptyMapRegistersNothing() throws Exception {
+            givenRecipesYml("recipes: {}\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).warn(anyString());
+            verify(UltiRecipeTestHelper.getMockLogger()).info("No custom recipes configured");
+        }
+    }
+
+    // --- every way an entry can fail to bind ----------------------------------------------
+
+    @Nested
+    @DisplayName("an entry that cannot be bound names its own key and reason")
+    class BindingFailures {
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("com.ultikits.plugins.recipe.service.RecipeYamlLoadTest#unbindableEntries")
+        void unbindableEntryIsSkippedWithItsReason(String description, String yml, String expectedWarning)
+                throws Exception {
+            givenRecipesYml(yml);
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            assertThat(warnings()).containsExactly(expectedWarning);
+        }
+
+        @Test
+        @DisplayName("an entry with no value at all is skipped — YAML cannot produce this, code can")
+        void nullEntryIsSkipped() {
+            // Bukkit drops a `name:` key whose value is empty, so no recipes.yml ever yields a
+            // null entry value. Only a map built in code does, and the binder must still refuse
+            // it rather than hand a null definition on to registration.
+            Map<String, Object> recipes = new LinkedHashMap<>();
+            recipes.put("hollow", null);
+            givenRecipesMap(recipes);
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly("Skipped recipe 'hollow': expected a mapping, found nothing");
+        }
+    }
+
+    // --- values already in their declared shape still work --------------------------------
+
+    @Nested
+    @DisplayName("a map already holding the declared types is still accepted")
+    class AlreadyBound {
+
+        @Test
+        @DisplayName("a RecipeDefinition built in code registers unchanged")
+        void builtDefinitionRegisters() throws Exception {
+            RecipeConfig.RecipeDefinition definition = new RecipeConfig.RecipeDefinition();
+            RecipeConfig.OutputItem output = new RecipeConfig.OutputItem();
+            output.setMaterial("DIAMOND");
+            definition.setOutput(output);
+            definition.setShape(Arrays.asList("DDD", "DDD", "DDD"));
+            Map<String, String> ingredients = new LinkedHashMap<>();
+            ingredients.put("D", "DIAMOND");
+            definition.setIngredients(ingredients);
+
+            Map<String, RecipeConfig.RecipeDefinition> recipes = new LinkedHashMap<>();
+            recipes.put("built", definition);
+            givenRecipesMap(recipes);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("built");
+        }
+
+        @Test
+        @DisplayName("an OutputItem built in code inside a parsed entry registers unchanged")
+        void builtOutputInsideAParsedEntryRegisters() throws Exception {
+            RecipeConfig.OutputItem output = new RecipeConfig.OutputItem();
+            output.setMaterial("DIAMOND");
+            output.setAmount(3);
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("output", output);
+            entry.put("shape", Arrays.asList("DDD", "DDD", "DDD"));
+            Map<String, String> ingredients = new LinkedHashMap<>();
+            ingredients.put("D", "DIAMOND");
+            entry.put("ingredients", ingredients);
+
+            Map<String, Object> recipes = new LinkedHashMap<>();
+            recipes.put("mixed", entry);
+            givenRecipesMap(recipes);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(registered("mixed").getResult().getAmount()).isEqualTo(3);
+        }
+    }
+}
