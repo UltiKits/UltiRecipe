@@ -85,9 +85,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * {@code DefaultConfigParser#parse}, which turns every nested YAML mapping into a
          * {@code LinkedHashMap} and never into the declared value type. The declared
          * {@code Map<String, RecipeDefinition>} field therefore holds maps at runtime, and
-         * reading a value back as a {@code RecipeDefinition} is a {@code ClassCastException}
-         * rather than a binding (UltiKits/UltiRecipe#16). This method performs that binding
-         * explicitly instead.
+         * reading a value back as a {@code RecipeDefinition} throws {@code ClassCastException}
+         * (UltiKits/UltiRecipe#16). This method binds the value explicitly.
          * <p>
          * Only the structure is bound here. Whether the resulting recipe is usable - the
          * output material resolves, the shape has the row count the service requires, an
@@ -96,46 +95,65 @@ public class RecipeConfig extends AbstractConfigEntity {
          * <p>
          * All three of {@code output}, {@code shape} and {@code ingredients} bind to
          * {@code null} when the operator did not supply them, or supplied them with nothing
-         * usable under them, rather than to the field's own non-null default - so that
-         * {@code RecipeService#registerRecipe}'s existing
+         * usable under them. The field's own non-null default is not used for those cases, so
+         * that {@code RecipeService#registerRecipe}'s existing
          * {@code output == null || shape == null || ingredients == null} guard still sees them.
          * "Nothing usable" means an empty mapping or list, and for {@code output} it means a
          * block carrying no {@code material}. Note that Bukkit DROPS a mapping key whose value
          * is empty, so {@code ingredients:} with only {@code D:} under it arrives here as an
-         * empty mapping rather than as an absent key; "empty" and "absent" therefore bind
-         * alike. The decision about what to do with that null is not made here.
+         * empty mapping; "empty" and "absent" therefore bind alike. The decision about what to do with that null is not made here.
          * <p>
-         * Where the boundary sits, and why it is necessary rather than stylistic. A value that
-         * is present but unusable is NOT folded into that guard: {@code material: ""} and
-         * {@code material: NOT_A_MATERIAL} already produce
-         * {@code Invalid output material for recipe: <name>}, which names the offending sub-key,
-         * and routing them through the guard would replace that with the vaguer
-         * {@code Invalid recipe definition}. The two shapes that ARE folded in have no such
-         * message to lose - measured by the {@code output-with-no-material-kept} mutation, their
-         * alternative is {@code Failed to register recipe: <name> - Name cannot be null}, an
-         * internal precondition message naming nothing the operator wrote.
+         * Which sub-key values bind to null, and which do not. One row per case, each
+         * independently checkable against the measurement named beside it; the artefacts are in
+         * {@code revert-proofs/w1/UltiRecipe-16-scripts/}.
+         * <pre>
+         * value written in recipes.yml   binds to   the operator reads        measured by
+         * ----------------------------   ---------  -----------------------   -----------------------
+         * ingredients: absent or empty   null       Invalid recipe            RecipeYamlLoadTest
+         * shape:       absent or empty   null       definition for: &lt;name&gt;    $RequiredKeyAbsent
+         * output:      absent, {}, or               (all three cases)
+         *              no material       null
+         *
+         * material: ""                   itself     Invalid output material   emptyMaterialString-
+         * material: NOT_A_MATERIAL       itself     for recipe: &lt;name&gt;        KeepsTheSpecificMessage,
+         *                                                                     unusableMaterialKeeps-
+         *                                                                     TheSpecificMessage
+         * </pre>
+         * The second group is not folded into the null guard: those two shapes have a message of
+         * their own that names the offending sub-key.
          * <p>
-         * Why the guard is worth reaching at all, for {@code ingredients} in particular.
-         * Measured against Paper 1.21.11 itself (bootstrapped, not read): its
+         * What each folded case would report without the null binding. One row per case, each
+         * measured; these are the mutation logs of the three bindings above.
+         * <pre>
+         * case                      without the null binding                        measured by
+         * -----------------------   ---------------------------------------------   -------------------
+         * ingredients absent/empty  Failed to register recipe: &lt;name&gt; -             paper-1.21.11-
+         *                           Index 0 out of bounds for length 0              probe.out, case B
+         * shape absent/empty        Recipe shape must have exactly 3 rows            MUTATION-shape-
+         *                           for: &lt;name&gt;                                     absent-keeps-the-
+         *                                                                           default
+         * output empty/no material  Failed to register recipe: &lt;name&gt; -             MUTATION-output-with-
+         *                           Name cannot be null                             no-material-kept
+         * </pre>
+         * <p>
+         * Why the {@code ingredients} row of that second table says what it says. Measured
+         * against Paper 1.21.11 itself, bootstrapped:
          * {@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty} replaces every shape
-         * character that has no ingredient with a space, and the two cases then diverge.
-         * <ul>
-         * <li>SOME characters undefined - {@code "DSD"} with {@code S} dropped becomes
-         * {@code "D D"}, and {@code ShapedRecipePattern.of} accepts it at width 3, height 3.
-         * A different, perfectly craftable recipe; NOT a smaller grid.</li>
-         * <li>ALL characters undefined, which is this guard's own case - the pattern is entirely
-         * blank and {@code ShapedRecipePattern.of} THROWS
-         * {@code ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0}.
+         * character that has no ingredient with a space, and
          * {@code CraftServer#addRecipe} carries no exception table around
-         * {@code addToCraftingManager}, so it propagates to {@code initRecipes}'s own catch and
-         * the operator reads {@code Failed to register recipe: <name> - Index 0 out of bounds
-         * for length 0} - a line that looks like a framework crash rather than a configuration
-         * mistake. The entry does not register.</li>
-         * </ul>
-         * So this guard replaces an opaque failure with a named one; it is not preventing a
-         * silent success. None of that is observable through MockBukkit, whose
-         * {@code ServerMock#addRecipe} stores the object and never reaches that code - which is
-         * why an earlier revision of this paragraph, measured there, was wrong twice.
+         * {@code addToCraftingManager}. One row per case:
+         * <pre>
+         * shape and ingredients         becomes      ShapedRecipePattern.of        probe row
+         * ---------------------------   ----------   ---------------------------   ---------
+         * "DSD" x3, S undefined         "D D" x3     accepts, width 3, height 3    case A
+         * "DDD" x3, all undefined       "   " x3     throws ArrayIndexOutOf-       case B
+         *                                            BoundsException: Index 0
+         *                                            out of bounds for length 0
+         * "DDD" x3, D defined           unchanged    accepts, width 3, height 3    control
+         * </pre>
+         * MockBukkit cannot observe any of that: its {@code ServerMock#addRecipe} stores the
+         * object and never reaches that code. Two earlier revisions of this javadoc were measured
+         * there and stated as server behaviour.
          *
          * @param value the parsed configuration value, or an already-built definition
          * @return the bound definition
@@ -150,17 +168,26 @@ public class RecipeConfig extends AbstractConfigEntity {
             // because module code and tests construct definitions directly. Do not read it as
             // evidence that the framework sometimes binds the declared type - it does not.
             //
-            // Two consequences to know when reading a failure, both because a definition handed
-            // in this way skips the binding below:
-            //   - left with RecipeDefinition's own empty-list default for `shape`, it reports
-            //     `Recipe shape must have exactly 3 rows`, while the same thing written in a
-            //     config file reports `Invalid recipe definition`;
-            //   - carrying an OutputItem whose `material` is null, it reports
-            //     `Failed to register recipe: <name> - Name cannot be null` from
-            //     createOutputItem, while the same thing in a config file is caught by the
-            //     material check below and reports `Invalid recipe definition`.
-            // Same operator situation, two messages each, because only one side went through a
-            // binder. A property of this early return, not a defect in any of those messages.
+            // A definition handed in this way skips the binding below, so the same operator
+            // situation reports differently depending on which side it came from. One row per
+            // case; the third row is what happens when BOTH fields deviate, which the first two
+            // rows do not cover - createOutputItem runs before the shape check
+            // (RecipeService:127-139), so only the material message appears:
+            //
+            //   hand-built definition          reports
+            //   ----------------------------   --------------------------------------------
+            //   shape left at its empty        Recipe shape must have exactly 3 rows for: <name>
+            //     default, material set
+            //   material null, shape well      Failed to register recipe: <name> -
+            //     formed                         Name cannot be null
+            //   both                           Failed to register recipe: <name> -
+            //                                    Name cannot be null   (the shape check is
+            //                                    never reached)
+            //
+            //   the same values written in a config file, for any of those three rows:
+            //                                  Invalid recipe definition for: <name>
+            //
+            // A property of this early return, not a defect in any of those messages.
             if (value instanceof RecipeDefinition) {
                 return (RecipeDefinition) value;
             }

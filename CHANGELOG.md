@@ -28,8 +28,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `shape` that is not a list - is now skipped on its own, with a warning naming that entry and the
   reason, and every other entry in the file still registers. An entry that leaves out `output`,
   `shape` or `ingredients` entirely, or supplies an `ingredients` block with nothing usable under
-  it, is refused with `Invalid recipe definition for: <name>`, which names the entry and what is
-  wrong with it (UltiKits/UltiRecipe#16).
+  it, is refused with `Invalid recipe definition for: <name>`, which names the entry
+  (UltiKits/UltiRecipe#16).
 - `/ul reload UltiRecipe` 现在会先重载本模块的配置（`config/recipes.yml`）并刷新其语言文件，再由本模块重新注册
   配方。此前本模块替换了框架的重载方法，这两步都不会执行。UltiTools 6.3.0 还会在此时报告
   `@ConditionalOnConfig` 漂移并输出框架自身的模块重载日志（UltiKits/UltiRecipe#11）。
@@ -42,5 +42,5 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   结构无法读取的配方条目——值不是映射、`output` 不是映射、`output.amount` 不是数字、`shape` 不是列表——现在
   会被单独跳过，并输出一条指明该条目及原因的警告，文件中的其余条目仍会正常注册。完全缺少 `output`、`shape`
   或 `ingredients` 的条目，以及 `ingredients` 下没有任何可用内容的条目，现在会以
-  `Invalid recipe definition for: <name>` 被拒绝，该提示会指明是哪一条配方以及问题所在
+  `Invalid recipe definition for: <name>` 被拒绝，该提示会指明是哪一条配方
   （UltiKits/UltiRecipe#16）。
