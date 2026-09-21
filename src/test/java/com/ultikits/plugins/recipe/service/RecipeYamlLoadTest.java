@@ -132,7 +132,29 @@ class RecipeYamlLoadTest {
                         "Skipped recipe 'e': shape: contains an empty entry"),
                 Arguments.of("ingredients that is not a mapping",
                         "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients: D\n",
-                        "Skipped recipe 'e': ingredients: expected a mapping, found the text 'D'"));
+                        "Skipped recipe 'e': ingredients: expected a mapping, found the text 'D'"),
+                // Compound values where a scalar belongs. Every one of these reaches a
+                // String.valueOf in the binder, which renders a Map or List as Java text -
+                // `{text=Blade}` - and for `name` that text became the item's display name with
+                // no warning at all. Codex P2 on #22, measured: mapping and list both registered.
+                Arguments.of("output.name as a mapping",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n      name:\n        text: Blade\n",
+                        "Skipped recipe 'e': output.name: expected text, found a mapping"),
+                Arguments.of("output.name as a list",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n      name:\n        - Blade\n",
+                        "Skipped recipe 'e': output.name: expected text, found a list"),
+                Arguments.of("output.material as a mapping",
+                        "recipes:\n  e:\n    output:\n      material:\n        text: DIAMOND\n",
+                        "Skipped recipe 'e': output.material: expected text, found a mapping"),
+                Arguments.of("an output.lore entry that is a mapping",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n      lore:\n        - text: line\n",
+                        "Skipped recipe 'e': output.lore: expected text, found a mapping"),
+                Arguments.of("a shape row that is a mapping",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    shape:\n      - DDD\n      - text: DDD\n",
+                        "Skipped recipe 'e': shape: expected text, found a mapping"),
+                Arguments.of("an ingredient whose material is a mapping",
+                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients:\n      D:\n        text: DIAMOND\n",
+                        "Skipped recipe 'e': ingredients.D: expected text, found a mapping"));
     }
 
     // --- fixtures -------------------------------------------------------------------------
