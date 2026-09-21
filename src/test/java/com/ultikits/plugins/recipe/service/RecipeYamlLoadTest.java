@@ -463,6 +463,85 @@ class RecipeYamlLoadTest {
         }
 
         @Test
+        @DisplayName("`output: {}` - supplied, but carrying no material")
+        void outputEmptyMapping() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  empty_output:\n"
+                    + "    output: {}\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertRefusedWithoutRegistering("empty_output");
+        }
+
+        @Test
+        @DisplayName("an `output` block with everything except `material`")
+        void outputWithoutMaterial() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_material:\n"
+                    + "    output:\n"
+                    + "      amount: 2\n"
+                    + "      name: \"&bNameless\"\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertRefusedWithoutRegistering("no_material");
+        }
+
+        @Test
+        @DisplayName("`shape: []` written out as an empty list")
+        void shapeExplicitlyEmpty() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  empty_shape:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape: []\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertRefusedWithoutRegistering("empty_shape");
+        }
+
+        /**
+         * The boundary of "nothing usable". A material that is present but unusable is NOT folded
+         * into this guard, deliberately: `material: ""` and `material: NOT_A_MATERIAL` both already
+         * produce `Invalid output material for recipe: <name>`, which names the offending sub-key,
+         * and routing them through the null guard would replace that with the vaguer
+         * `Invalid recipe definition`. Measured, not assumed - both were run against this binder.
+         */
+        @Test
+        @DisplayName("a material that is present but unusable keeps its own, more specific message")
+        void unusableMaterialKeepsTheSpecificMessage() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  bad_material:\n"
+                    + "    output:\n"
+                    + "      material: NOT_A_MATERIAL\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
+            assertThat(warnings()).containsExactly("Invalid output material for recipe: bad_material");
+        }
+
+        @Test
         @DisplayName("no `output` key at all - the one arm of that guard the binder never broke")
         void outputKeyAbsent() throws Exception {
             givenRecipesYml(
@@ -505,6 +584,63 @@ class RecipeYamlLoadTest {
             assertThat(service.initRecipes()).isEqualTo(1);
             assertThat(service.getRecipeList()).containsExactly("good");
             assertThat(warnings()).containsExactly("Invalid recipe definition for: no_ingredients");
+        }
+    }
+
+    // --- a defect this change does not fix, pinned so wave 2 can see the contract ---------
+
+    /**
+     * `RecipeService#registerRecipe`'s ingredient loop uses `continue` for both of its failure
+     * branches - a key that is not one character, and a material that does not resolve - and then
+     * registers the recipe regardless of how many ingredients were actually set. Filed as
+     * UltiKits/UltiRecipe#21; NOT fixed here, because that loop is recipe validation and belongs
+     * to wave 2 with #13/#14.
+     *
+     * <p>Pinned rather than left unrecorded because wave 2 touches exactly this method, and
+     * without a test nothing in the tree says that "warn, skip the ingredient, register anyway" is
+     * the contract today.
+     *
+     * <p><b>What this harness can and cannot see.</b> MockBukkit's `ServerMock#addRecipe` is a
+     * store - it null-checks and keeps the object - so what is asserted below is what the module
+     * handed over. It never reaches `CraftShapedRecipe#addToCraftingManager`, so it cannot observe
+     * what a real server then does with it. Read out of Paper 1.21.11's own bytecode
+     * (`replaceUndefinedIngredientsWithEmpty`): every shape character with no ingredient is
+     * replaced by a space. So on a real server this entry does not become an uncraftable recipe -
+     * it becomes `D D` / `D D` / `D D`, a DIFFERENT and perfectly craftable one. Do not restate
+     * that consequence from this test; it is recorded in #21, measured against the server jar.
+     */
+    @Nested
+    @DisplayName("known defect UltiKits/UltiRecipe#21 - an unusable ingredient still registers")
+    class UnusableIngredientStillRegisters {
+
+        @Test
+        @DisplayName("an unknown ingredient material is warned about, skipped, and the recipe registers without it")
+        void unknownIngredientMaterialStillRegisters() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  partial:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DSD\"\n"
+                    + "      - \"DSD\"\n"
+                    + "      - \"DSD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n"
+                    + "      S: NOT_A_MATERIAL\n");
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings())
+                    .containsExactly("Unknown material 'NOT_A_MATERIAL' in recipe: partial");
+            // The warning and the success line are about the same recipe. That pairing is the
+            // defect, so assert both halves - a future fix has to change one of them.
+            verify(UltiRecipeTestHelper.getMockLogger()).info("Registered recipe: partial");
+            assertThat(service.getRecipeList()).containsExactly("partial");
+
+            ShapedRecipe recipe = registered("partial");
+            assertThat(recipe.getShape()).containsExactly("DSD", "DSD", "DSD");
+            assertThat(recipe.getIngredientMap().get('D')).isNotNull();
+            assertThat(recipe.getIngredientMap().get('S')).isNull();
         }
     }
 
