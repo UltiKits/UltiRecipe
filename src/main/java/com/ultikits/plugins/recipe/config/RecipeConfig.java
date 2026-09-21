@@ -105,20 +105,37 @@ public class RecipeConfig extends AbstractConfigEntity {
          * empty mapping rather than as an absent key; "empty" and "absent" therefore bind
          * alike. The decision about what to do with that null is not made here.
          * <p>
-         * Where the boundary sits, and why: a value that is present but unusable is NOT folded
-         * into that guard. {@code material: ""} and {@code material: NOT_A_MATERIAL} already
-         * produce {@code Invalid output material for recipe: <name>}, which names the offending
-         * sub-key; routing them through the guard would replace that with the vaguer
-         * {@code Invalid recipe definition}.
+         * Where the boundary sits, and why it is necessary rather than stylistic. A value that
+         * is present but unusable is NOT folded into that guard: {@code material: ""} and
+         * {@code material: NOT_A_MATERIAL} already produce
+         * {@code Invalid output material for recipe: <name>}, which names the offending sub-key,
+         * and routing them through the guard would replace that with the vaguer
+         * {@code Invalid recipe definition}. The two shapes that ARE folded in have no such
+         * message to lose - measured by the {@code output-with-no-material-kept} mutation, their
+         * alternative is {@code Failed to register recipe: <name> - Name cannot be null}, an
+         * internal precondition message naming nothing the operator wrote.
          * <p>
-         * Why the guard is worth reaching at all, for {@code ingredients} in particular: read
-         * out of Paper 1.21.11's own {@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty},
-         * a shape character with no ingredient is replaced by a space before the recipe reaches
-         * the crafting manager. An entry whose ingredients were dropped therefore does not
-         * become an inert recipe - it becomes a DIFFERENT one over a smaller grid, which may
-         * well be craftable and is not what the operator wrote. This is not observable through
-         * MockBukkit, whose {@code ServerMock#addRecipe} stores the object and never reaches
-         * that code.
+         * Why the guard is worth reaching at all, for {@code ingredients} in particular.
+         * Measured against Paper 1.21.11 itself (bootstrapped, not read): its
+         * {@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty} replaces every shape
+         * character that has no ingredient with a space, and the two cases then diverge.
+         * <ul>
+         * <li>SOME characters undefined - {@code "DSD"} with {@code S} dropped becomes
+         * {@code "D D"}, and {@code ShapedRecipePattern.of} accepts it at width 3, height 3.
+         * A different, perfectly craftable recipe; NOT a smaller grid.</li>
+         * <li>ALL characters undefined, which is this guard's own case - the pattern is entirely
+         * blank and {@code ShapedRecipePattern.of} THROWS
+         * {@code ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0}.
+         * {@code CraftServer#addRecipe} carries no exception table around
+         * {@code addToCraftingManager}, so it propagates to {@code initRecipes}'s own catch and
+         * the operator reads {@code Failed to register recipe: <name> - Index 0 out of bounds
+         * for length 0} - a line that looks like a framework crash rather than a configuration
+         * mistake. The entry does not register.</li>
+         * </ul>
+         * So this guard replaces an opaque failure with a named one; it is not preventing a
+         * silent success. None of that is observable through MockBukkit, whose
+         * {@code ServerMock#addRecipe} stores the object and never reaches that code - which is
+         * why an earlier revision of this paragraph, measured there, was wrong twice.
          *
          * @param value the parsed configuration value, or an already-built definition
          * @return the bound definition
@@ -133,12 +150,17 @@ public class RecipeConfig extends AbstractConfigEntity {
             // because module code and tests construct definitions directly. Do not read it as
             // evidence that the framework sometimes binds the declared type - it does not.
             //
-            // One consequence to know when reading a failure: a definition handed in this way
-            // skips the binding below, so a hand-built definition left with RecipeDefinition's
-            // own empty-list default for `shape` reports `Recipe shape must have exactly 3 rows`,
-            // while the same thing written in a config file reports `Invalid recipe definition`.
-            // Same operator situation, two messages, because only one of them went through a
-            // binder. That is a property of this early return, not a defect in either message.
+            // Two consequences to know when reading a failure, both because a definition handed
+            // in this way skips the binding below:
+            //   - left with RecipeDefinition's own empty-list default for `shape`, it reports
+            //     `Recipe shape must have exactly 3 rows`, while the same thing written in a
+            //     config file reports `Invalid recipe definition`;
+            //   - carrying an OutputItem whose `material` is null, it reports
+            //     `Failed to register recipe: <name> - Name cannot be null` from
+            //     createOutputItem, while the same thing in a config file is caught by the
+            //     material check below and reports `Invalid recipe definition`.
+            // Same operator situation, two messages each, because only one side went through a
+            // binder. A property of this early return, not a defect in any of those messages.
             if (value instanceof RecipeDefinition) {
                 return (RecipeDefinition) value;
             }
