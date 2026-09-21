@@ -378,12 +378,29 @@ class RecipeYamlLoadTest {
     class RequiredKeyAbsent {
 
         /**
-         * Measured on the unfixed binder, which is why these cases exist: an entry with no
-         * `ingredients` registered, logged `Registered recipe: <name>` at INFO and appeared in
-         * `/recipe list`, with no warning at all - and crafting it produced nothing, forever.
-         * Paper does not reject a shape whose characters have no ingredient (it DOES reject an
-         * ingredient symbol absent from the shape, measured separately), so nothing downstream
-         * catches this.
+         * <b>What this harness sees, and what a real server does - they differ here, so read
+         * both.</b> An earlier revision of this paragraph stated the MockBukkit observation as
+         * unqualified real-server fact, twice, and was wrong both times. The rule this class
+         * exists to serve applies to its own javadoc: state the instrument with the claim.
+         *
+         * <p>On MockBukkit, which is what the tests below assert: before the fix an entry with
+         * no `ingredients` registered, logged `Registered recipe: <name>` at INFO and appeared
+         * in `/recipe list`, with no warning at all. `ServerMock#addRecipe` null-checks and
+         * stores; it never reaches `CraftShapedRecipe#addToCraftingManager`.
+         *
+         * <p>On Paper 1.21.11, measured by bootstrapping the server jar and calling its own
+         * classes: `replaceUndefinedIngredientsWithEmpty` turns every undefined shape character
+         * into a space, so this entry's pattern is entirely blank, and `ShapedRecipePattern.of`
+         * then THROWS `ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0`.
+         * `CraftServer#addRecipe` has no exception table around `addToCraftingManager`, so it
+         * reaches `initRecipes`'s catch and the operator reads
+         * `Failed to register recipe: <name> - Index 0 out of bounds for length 0`. It does not
+         * register there either - it fails opaquely, in a line that reads like a framework crash
+         * rather than a configuration mistake.
+         *
+         * <p>So the fix is worth making on both instruments, for different reasons: it replaces
+         * a silent false success here, and an unreadable failure there. Neither half may be
+         * restated from the other.
          *
          * <p>`registerRecipe` has always refused a definition whose output, shape or ingredients
          * is null. The binder must therefore hand it null when the operator supplied nothing,
@@ -521,6 +538,30 @@ class RecipeYamlLoadTest {
          * `Invalid recipe definition`. Measured, not assumed - both were run against this binder.
          */
         @Test
+        @DisplayName("an empty material string keeps that message too - the other shape the boundary defends")
+        void emptyMaterialStringKeepsTheSpecificMessage() throws Exception {
+            // Pinned because a wave-2 hardening to `getMaterial() == null || isEmpty()` would
+            // move this shape across the boundary the binder's javadoc defends, from
+            // `Invalid output material` to `Invalid recipe definition`, with the suite green.
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  blank_material:\n"
+                    + "    output:\n"
+                    + "      material: \"\"\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
+            assertThat(warnings()).containsExactly("Invalid output material for recipe: blank_material");
+        }
+
+        @Test
         @DisplayName("a material that is present but unusable keeps its own, more specific message")
         void unusableMaterialKeepsTheSpecificMessage() throws Exception {
             givenRecipesYml(
@@ -606,8 +647,12 @@ class RecipeYamlLoadTest {
      * what a real server then does with it. Read out of Paper 1.21.11's own bytecode
      * (`replaceUndefinedIngredientsWithEmpty`): every shape character with no ingredient is
      * replaced by a space. So on a real server this entry does not become an uncraftable recipe -
-     * it becomes `D D` / `D D` / `D D`, a DIFFERENT and perfectly craftable one. Do not restate
-     * that consequence from this test; it is recorded in #21, measured against the server jar.
+     * it becomes `D D` / `D D` / `D D`, which `ShapedRecipePattern.of` accepts at width 3,
+     * height 3 (measured against the bootstrapped server jar): a DIFFERENT and perfectly
+     * craftable recipe, over the SAME 3x3 grid, not a smaller one. That holds only because part
+     * of the shape is still defined - see `multiCharacterIngredientKeyStillRegisters` for the
+     * case where none of it is, which throws instead. Do not restate either consequence from
+     * this test; both are recorded in #21, measured against the server jar.
      */
     @Nested
     @DisplayName("known defect UltiKits/UltiRecipe#21 - an unusable ingredient still registers")
@@ -646,10 +691,18 @@ class RecipeYamlLoadTest {
         /**
          * The loop's other failure branch, and the last of `RecipeService`'s seven refusal
          * messages to have had no test reaching it through the framework's own bind path. Same
-         * defect, same issue: the key is rejected, no ingredient is set at all, and the recipe
-         * registers regardless. On a real server every character of the shape is then replaced
-         * by a space - see this class's own note above for why that must not be restated from
-         * what is asserted here.
+         * defect, same issue: the key is rejected, no ingredient is set at all, and on this
+         * harness the recipe registers regardless.
+         *
+         * <p><b>This case is the TOTAL one, so the note above does not transfer to it.</b> That
+         * note describes a partially defined shape, where the substitution leaves a different
+         * but valid pattern. Here NOTHING is defined, so every character becomes a space and the
+         * pattern is entirely blank - measured against Paper 1.21.11, `ShapedRecipePattern.of`
+         * throws `ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0` for that,
+         * so on a real server this entry does not register at all and the operator reads
+         * `Failed to register recipe: wide_key - Index 0 out of bounds for length 0`. The
+         * registration asserted below is a MockBukkit artefact, and `UltiKits/UltiRecipe#21`
+         * records both branches separately for that reason.
          */
         @Test
         @DisplayName("a multi-character ingredient key is warned about, skipped, and the recipe registers with no ingredients at all")
