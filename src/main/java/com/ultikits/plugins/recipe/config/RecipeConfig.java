@@ -267,15 +267,15 @@ public class RecipeConfig extends AbstractConfigEntity {
             OutputItem item = new OutputItem();
             Object material = map.get("material");
             if (material != null) {
-                item.setMaterial(String.valueOf(material));
+                item.setMaterial(asText("output.material", material));
             }
             // Deliberate asymmetry, recorded so the next reader does not take one half for the
-            // house style: material and name accept any scalar through String.valueOf, because
-            // a material name is text and Material.matchMaterial judges it; amount refuses a
-            // non-number outright, because silently coercing a stack size is how an operator
-            // ends up with a quantity they did not write. Two consequences follow, both
-            // accepted: amount: "1" quoted as text skips the whole entry, and amount: 2.5 is
-            // truncated to 2 by intValue() without a warning.
+            // house style: material and name accept any SCALAR (asText refuses a mapping or a
+            // list), because a material name is text and Material.matchMaterial judges it;
+            // amount refuses a non-number outright, because silently coercing a stack size is
+            // how an operator ends up with a quantity they did not write. Two consequences
+            // follow, both accepted: amount: "1" quoted as text skips the whole entry, and
+            // amount: 2.5 is truncated to 2 by intValue() without a warning.
             Object amount = map.get("amount");
             if (amount != null) {
                 if (!(amount instanceof Number)) {
@@ -286,7 +286,7 @@ public class RecipeConfig extends AbstractConfigEntity {
             }
             Object name = map.get("name");
             if (name != null) {
-                item.setName(String.valueOf(name));
+                item.setName(asText("output.name", name));
             }
             Object lore = map.get("lore");
             if (lore != null) {
@@ -314,7 +314,7 @@ public class RecipeConfig extends AbstractConfigEntity {
             if (element == null) {
                 throw new IllegalArgumentException(field + ": contains an empty entry");
             }
-            result.add(String.valueOf(element));
+            result.add(asText(field, element));
         }
         return result;
     }
@@ -338,9 +338,35 @@ public class RecipeConfig extends AbstractConfigEntity {
                 throw new IllegalArgumentException(
                         field + "." + entry.getKey() + ": has no value");
             }
-            result.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+            result.put(String.valueOf(entry.getKey()),
+                       asText(field + "." + entry.getKey(), entry.getValue()));
         }
         return result;
+    }
+
+    /**
+     * Binds a parsed scalar onto text.
+     * <p>
+     * Every caller of this method used to call {@code String.valueOf} directly, which renders a
+     * {@code Map} or {@code List} as Java text - an indentation mistake under {@code name:}
+     * became the display name {@code {text=Blade}} and the recipe registered with no warning
+     * (Codex P2 on pull request #22, measured). A compound value cannot be read as text, so it
+     * is refused here like any other structural mismatch. Scalars are unaffected, which is why
+     * {@code material: ""} and {@code material: NOT_A_MATERIAL} still reach
+     * {@code Material.matchMaterial} and still report
+     * {@code Invalid output material for recipe: <name>}.
+     *
+     * @param field the sub-key being bound, used in the failure message
+     * @param value the parsed configuration value, never {@code null}
+     * @return the value as text
+     * @throws IllegalArgumentException if the value is a mapping or a list
+     */
+    private static String asText(String field, Object value) {
+        if (value instanceof Map || value instanceof List) {
+            throw new IllegalArgumentException(
+                    field + ": expected text, found " + describeType(value));
+        }
+        return String.valueOf(value);
     }
 
     /**
