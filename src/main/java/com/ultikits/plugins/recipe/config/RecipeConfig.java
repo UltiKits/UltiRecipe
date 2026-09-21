@@ -93,6 +93,20 @@ public class RecipeConfig extends AbstractConfigEntity {
          * output material resolves, the shape has the row count the service requires, an
          * ingredient key is one character - stays where it already lives, in
          * {@code RecipeService#registerRecipe}.
+         * <p>
+         * A key the operator did not supply, or supplied with nothing usable under it, binds
+         * to {@code null} rather than to the field's own non-null default, so that
+         * {@code RecipeService#registerRecipe}'s existing
+         * {@code output == null || shape == null || ingredients == null} guard still sees it
+         * (gate 1 WR-01). This matters most for {@code ingredients}: Paper accepts a
+         * {@code ShapedRecipe} whose shape characters have no ingredient, so without that
+         * guard an entry with no ingredients registers, logs {@code Registered recipe}, shows
+         * up in {@code /recipe list}, and produces nothing in a crafting table, forever, with
+         * no warning naming the missing key. Note that Bukkit DROPS a mapping key whose value
+         * is empty, so {@code ingredients:} with only {@code D:} under it arrives here as an
+         * empty mapping rather than as an absent key - hence "empty" and "absent" are bound to
+         * the same {@code null}. The decision about what to do with that null is not made
+         * here.
          *
          * @param value the parsed configuration value, or an already-built definition
          * @return the bound definition
@@ -100,6 +114,12 @@ public class RecipeConfig extends AbstractConfigEntity {
          *                                  naming the offending sub-key and what was found
          */
         public static RecipeDefinition fromConfigValue(Object value) {
+            // Unreachable from the framework's own binder, which never produces a typed value:
+            // DefaultConfigParser#parse returns a LinkedHashMap for a section, a List for a
+            // sequence and the value itself for a scalar. It is kept because a caller that
+            // already holds a definition should not be refused for holding the right type, and
+            // because module code and tests construct definitions directly. Do not read it as
+            // evidence that the framework sometimes binds the declared type - it does not.
             if (value instanceof RecipeDefinition) {
                 return (RecipeDefinition) value;
             }
@@ -110,17 +130,15 @@ public class RecipeConfig extends AbstractConfigEntity {
             Map<?, ?> map = (Map<?, ?>) value;
             RecipeDefinition definition = new RecipeDefinition();
             Object output = map.get("output");
-            if (output != null) {
-                definition.setOutput(OutputItem.fromConfigValue(output));
-            }
+            definition.setOutput(output == null ? null : OutputItem.fromConfigValue(output));
             Object shape = map.get("shape");
-            if (shape != null) {
-                definition.setShape(toStringList("shape", shape));
-            }
+            List<String> boundShape = shape == null ? null : toStringList("shape", shape);
+            definition.setShape(boundShape == null || boundShape.isEmpty() ? null : boundShape);
             Object ingredients = map.get("ingredients");
-            if (ingredients != null) {
-                definition.setIngredients(toStringMap("ingredients", ingredients));
-            }
+            Map<String, String> boundIngredients =
+                    ingredients == null ? null : toStringMap("ingredients", ingredients);
+            definition.setIngredients(
+                    boundIngredients == null || boundIngredients.isEmpty() ? null : boundIngredients);
             return definition;
         }
     }
@@ -176,6 +194,13 @@ public class RecipeConfig extends AbstractConfigEntity {
             if (material != null) {
                 item.setMaterial(String.valueOf(material));
             }
+            // Deliberate asymmetry, recorded so the next reader does not take one half for the
+            // house style: material and name accept any scalar through String.valueOf, because
+            // a material name is text and Material.matchMaterial judges it; amount refuses a
+            // non-number outright, because silently coercing a stack size is how an operator
+            // ends up with a quantity they did not write. Two consequences follow, both
+            // accepted: amount: "1" quoted as text skips the whole entry, and amount: 2.5 is
+            // truncated to 2 by intValue() without a warning.
             Object amount = map.get("amount");
             if (amount != null) {
                 if (!(amount instanceof Number)) {
