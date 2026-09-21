@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -367,6 +368,143 @@ class RecipeYamlLoadTest {
 
             assertThat(service.initRecipes()).isZero();
             assertThat(warnings()).containsExactly("Skipped recipe 'e': ingredients.D: has no value");
+        }
+    }
+
+    // --- a required key that is absent must not produce a false success -------------------
+
+    @Nested
+    @DisplayName("an entry missing a required key never registers a recipe nobody can craft")
+    class RequiredKeyAbsent {
+
+        /**
+         * Measured on the unfixed binder, which is why these cases exist: an entry with no
+         * `ingredients` registered, logged `Registered recipe: <name>` at INFO and appeared in
+         * `/recipe list`, with no warning at all - and crafting it produced nothing, forever.
+         * Paper does not reject a shape whose characters have no ingredient (it DOES reject an
+         * ingredient symbol absent from the shape, measured separately), so nothing downstream
+         * catches this.
+         *
+         * <p>`registerRecipe` has always refused a definition whose output, shape or ingredients
+         * is null. The binder must therefore hand it null when the operator supplied nothing,
+         * rather than the field's own non-null default, or that guard cannot fire.
+         */
+        private void assertRefusedWithoutRegistering(String key) {
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            // The harm is the false success, so assert its absence directly.
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
+            assertThat(warnings()).containsExactly("Invalid recipe definition for: " + key);
+        }
+
+        @Test
+        @DisplayName("no `ingredients` key at all")
+        void ingredientsKeyAbsent() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_ingredients:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n");
+
+            assertRefusedWithoutRegistering("no_ingredients");
+        }
+
+        @Test
+        @DisplayName("`ingredients:` whose only entry has no material - Bukkit drops that key, leaving it empty")
+        void ingredientsPresentButEmptyAfterBukkitDropsTheKey() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  hollow_ingredients:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D:\n");
+
+            assertRefusedWithoutRegistering("hollow_ingredients");
+        }
+
+        @Test
+        @DisplayName("`ingredients: {}` written out as an empty mapping")
+        void ingredientsExplicitlyEmpty() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  empty_ingredients:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients: {}\n");
+
+            assertRefusedWithoutRegistering("empty_ingredients");
+        }
+
+        @Test
+        @DisplayName("no `shape` key at all")
+        void shapeKeyAbsent() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_shape:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertRefusedWithoutRegistering("no_shape");
+        }
+
+        @Test
+        @DisplayName("no `output` key at all - the one arm of that guard the binder never broke")
+        void outputKeyAbsent() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_output:\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertRefusedWithoutRegistering("no_output");
+        }
+
+        @Test
+        @DisplayName("the refusal costs the well-formed entry beside it nothing")
+        void aRefusedEntryDoesNotCostItsNeighbour() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_ingredients:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "  good:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            // The neighbour is this case's own control: if the fixture or the path were broken,
+            // this count would be 0 rather than 1 and the refusal above would prove nothing.
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly("Invalid recipe definition for: no_ingredients");
         }
     }
 
