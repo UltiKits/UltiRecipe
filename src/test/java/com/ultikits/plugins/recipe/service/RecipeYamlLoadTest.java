@@ -131,10 +131,7 @@ class RecipeYamlLoadTest {
                         "Skipped recipe 'e': shape: contains an empty entry"),
                 Arguments.of("ingredients that is not a mapping",
                         "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients: D\n",
-                        "Skipped recipe 'e': ingredients: expected a mapping, found the text 'D'"),
-                Arguments.of("an ingredient with no material",
-                        "recipes:\n  e:\n    output:\n      material: DIAMOND\n    ingredients:\n      D:\n",
-                        "Skipped recipe 'e': ingredients.D: has no value"));
+                        "Skipped recipe 'e': ingredients: expected a mapping, found the text 'D'"));
     }
 
     // --- fixtures -------------------------------------------------------------------------
@@ -338,18 +335,38 @@ class RecipeYamlLoadTest {
             assertThat(warnings()).containsExactly(expectedWarning);
         }
 
+        // The two cases below cannot be expressed as YAML, and that is a measured property of
+        // Bukkit's parser rather than an assumption: a mapping key whose value is empty
+        // (`hollow:`, `D:`) is DROPPED, so the key never reaches the binder at all. A list
+        // element that is empty is NOT dropped and arrives as null, which is why the empty
+        // shape row above is a YAML case and these two are not. Both branches are still
+        // reachable from a map built in code, so both are still the binder's business.
+
         @Test
         @DisplayName("an entry with no value at all is skipped — YAML cannot produce this, code can")
         void nullEntryIsSkipped() {
-            // Bukkit drops a `name:` key whose value is empty, so no recipes.yml ever yields a
-            // null entry value. Only a map built in code does, and the binder must still refuse
-            // it rather than hand a null definition on to registration.
             Map<String, Object> recipes = new LinkedHashMap<>();
             recipes.put("hollow", null);
             givenRecipesMap(recipes);
 
             assertThat(service.initRecipes()).isZero();
             assertThat(warnings()).containsExactly("Skipped recipe 'hollow': expected a mapping, found nothing");
+        }
+
+        @Test
+        @DisplayName("an ingredient with no material is skipped — YAML cannot produce this, code can")
+        void nullIngredientValueIsSkipped() {
+            Map<String, Object> ingredients = new LinkedHashMap<>();
+            ingredients.put("D", null);
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("ingredients", ingredients);
+
+            Map<String, Object> recipes = new LinkedHashMap<>();
+            recipes.put("e", entry);
+            givenRecipesMap(recipes);
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly("Skipped recipe 'e': ingredients.D: has no value");
         }
     }
 
