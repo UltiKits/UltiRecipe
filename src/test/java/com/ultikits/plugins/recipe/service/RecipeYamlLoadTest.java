@@ -642,6 +642,41 @@ class RecipeYamlLoadTest {
             assertThat(recipe.getIngredientMap().get('D')).isNotNull();
             assertThat(recipe.getIngredientMap().get('S')).isNull();
         }
+
+        /**
+         * The loop's other failure branch, and the last of `RecipeService`'s seven refusal
+         * messages to have had no test reaching it through the framework's own bind path. Same
+         * defect, same issue: the key is rejected, no ingredient is set at all, and the recipe
+         * registers regardless. On a real server every character of the shape is then replaced
+         * by a space - see this class's own note above for why that must not be restated from
+         * what is asserted here.
+         */
+        @Test
+        @DisplayName("a multi-character ingredient key is warned about, skipped, and the recipe registers with no ingredients at all")
+        void multiCharacterIngredientKeyStillRegisters() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  wide_key:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      DD: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings())
+                    .containsExactly("Ingredient key must be a single character for recipe: wide_key");
+            verify(UltiRecipeTestHelper.getMockLogger()).info("Registered recipe: wide_key");
+            assertThat(service.getRecipeList()).containsExactly("wide_key");
+
+            ShapedRecipe recipe = registered("wide_key");
+            assertThat(recipe.getShape()).containsExactly("DDD", "DDD", "DDD");
+            // Nothing was set: the shape's only character has no ingredient behind it.
+            assertThat(recipe.getIngredientMap().get('D')).isNull();
+        }
     }
 
     // --- values already in their declared shape still work --------------------------------
