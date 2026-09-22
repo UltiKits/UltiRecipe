@@ -128,6 +128,20 @@ public class RecipeService {
             return false;
         }
 
+        // Enforce the constraints OutputItem's own fields declare (UltiKits/UltiRecipe#14). The
+        // framework's validateFields() reads @NotEmpty/@Range only off the @ConfigEntry fields on
+        // the entity itself and never recurses into a map value, so until this call the two
+        // annotations on OutputItem were evaluated by nothing. This runs BEFORE createOutputItem
+        // on purpose: an empty material used to reach Material.matchMaterial and come back as the
+        // same "Invalid output material" line a misspelled material produces, so the log could
+        // not tell a blank field from a typo. A violating entry is skipped on its own, named; the
+        // rest of the file still registers, and nothing is clamped.
+        String outputViolation = definition.getOutput().describeConstraintViolation();
+        if (outputViolation != null) {
+            getLogger().warn("Invalid output for recipe: " + name + " - " + outputViolation);
+            return false;
+        }
+
         // Create output item
         ItemStack output = createOutputItem(definition.getOutput());
         if (output == null) {

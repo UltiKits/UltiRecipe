@@ -1,5 +1,7 @@
 package com.ultikits.plugins.recipe.config;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -115,13 +117,20 @@ public class RecipeConfig extends AbstractConfigEntity {
          * output:      absent, {}, or               (all three cases)         (each case has its
          *              no material       null                                  own test there)
          *
-         * material: ""                   itself     Invalid output material   emptyMaterialString-
-         * material: NOT_A_MATERIAL       itself     for recipe: &lt;name&gt;        KeepsTheSpecificMessage,
-         *                                                                     unusableMaterialKeeps-
-         *                                                                     TheSpecificMessage
+         * material: ""                   itself     Invalid output for        emptyMaterialString-
+         *                                           recipe: &lt;name&gt; -         NamesTheDeclared-
+         *                                           output.material: must    Constraint
+         *                                           not be empty
+         *
+         * material: NOT_A_MATERIAL       itself     Invalid output material   unusableMaterialKeeps-
+         *                                           for recipe: &lt;name&gt;       TheSpecificMessage
          * </pre>
-         * The second group is not folded into the null guard: those two shapes have a message of
-         * their own that names the offending sub-key.
+         * The second group is not folded into the null guard: each of those shapes has a message
+         * of its own that names the offending sub-key. The two used to share the second message,
+         * which meant a blank field and a typo read identically in the log; the empty shape moved
+         * onto the {@code @NotEmpty} the field declares when UltiKits/UltiRecipe#14 made that
+         * annotation actually run (see {@link OutputItem#describeConstraintViolation()}). The
+         * unusable shape did not move, and its test is the control that says so.
          * <p>
          * What each folded case would report without the null binding. One row per case, each
          * measured; these are the mutation logs of the three bindings above.
@@ -136,6 +145,12 @@ public class RecipeConfig extends AbstractConfigEntity {
          * output empty/no material  Failed to register recipe: &lt;name&gt; -    MUTATION-output-
          *                           Name cannot be null                     with-no-material-kept
          * </pre>
+         * That third row is the wave-1 measurement, and UltiKits/UltiRecipe#14 has since moved
+         * what it would report: with the null binding removed, an output carrying no material now
+         * meets {@code @NotEmpty} first and reports
+         * {@code Invalid output for recipe: &lt;name&gt; - output.material: must not be empty} instead
+         * of the NPE the raw {@code Material.matchMaterial(null)} call produced. The row is left
+         * as it was measured, with this note, rather than rewritten to a number nobody re-ran.
          * <p>
          * Why the {@code ingredients} row of that second table says what it says. Measured
          * against Paper 1.21.11 itself, bootstrapped:
@@ -176,18 +191,23 @@ public class RecipeConfig extends AbstractConfigEntity {
             // A definition handed in this way skips the binding below, so the same operator
             // situation reports differently depending on which side it came from. One row per
             // case; the third row is what happens when BOTH fields deviate, which the first two
-            // rows do not cover - createOutputItem runs before the shape check
-            // (RecipeService:132 and :144 respectively), so only the material message appears:
+            // rows do not cover - the output constraints are read before the shape check
+            // (RecipeService:139 and :158 respectively), so only the material message appears:
             //
             //   hand-built definition          reports
             //   ----------------------------   --------------------------------------------
             //   shape left at its empty        Recipe shape must have exactly 3 rows for: <name>
             //     default, material set
-            //   material null, shape well      Failed to register recipe: <name> -
-            //     formed                         Name cannot be null
-            //   both                           Failed to register recipe: <name> -
-            //                                    Name cannot be null   (the shape check is
-            //                                    never reached)
+            //   material null, shape well      Invalid output for recipe: <name> -
+            //     formed                         output.material: must not be empty
+            //   both                           Invalid output for recipe: <name> -
+            //                                    output.material: must not be empty
+            //                                    (the shape check is never reached)
+            //
+            // The two material rows read "Failed to register recipe: <name> - Name cannot be
+            // null" before UltiKits/UltiRecipe#14: a null material used to reach
+            // Material.matchMaterial(null) and surface that call's own NPE message through
+            // initRecipes' catch. The declared @NotEmpty now refuses it first, by name.
             //
             //   the same values written in a config file, for any of those three rows:
             //                                  Invalid recipe definition for: <name>
@@ -294,6 +314,86 @@ public class RecipeConfig extends AbstractConfigEntity {
             }
             return item;
         }
+
+        /**
+         * Describes the first declared configuration constraint this output item violates, or
+         * {@code null} when it violates none.
+         * <p>
+         * The framework's own {@code AbstractConfigEntity#validateFields()} reads the
+         * {@code annotations.config} constraints, but only off the {@code @ConfigEntry} fields
+         * the entity itself declares - here that is {@code RecipeConfig.enabled} and
+         * {@code RecipeConfig.recipes}, neither of which carries one. It never recurses into a
+         * map value's object graph, so the {@code @NotEmpty} on {@code material} and the
+         * {@code @Range} on {@code amount} were evaluated by nothing at all
+         * (UltiKits/UltiRecipe#14). This method reads them, with the framework's own semantics:
+         * {@code @Range} is inclusive at both ends and ignores a non-numeric value, and
+         * {@code @NotEmpty} treats null and whitespace-only alike.
+         * <p>
+         * It walks the declared fields rather than naming the two, so adding a third field with
+         * either annotation needs no change here. The other two annotations in that package,
+         * {@code @Size} and {@code @Pattern}, are not read, because no field on this class
+         * declares one - and that is not left to a promise: {@code RecipeYamlLoadTest}'s
+         * {@code onlyTheConstraintsThisModuleReadsAreDeclared} fails the moment a field declares
+         * a constraint this method does not read, which is the same silent-no-op defect one
+         * level up.
+         * <p>
+         * Reporting, not refusing, is the whole contract: the caller
+         * ({@code RecipeService#registerRecipe}) skips that one recipe with a warning naming the
+         * sub-key, the offending value and the bounds, and every other entry in the file still
+         * registers. Nothing is clamped - an operator who wrote {@code amount: 100} gets told so,
+         * rather than quietly receiving 64.
+         *
+         * @return the violation, worded as the operator's own {@code output.<sub-key>} path, or
+         *         {@code null} if every declared constraint is satisfied
+         */
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        // Reads this class's own private fields reflectively, which is the point: naming them
+        // one by one is what lets a later field be added with a constraint that nothing reads.
+        public String describeConstraintViolation() {
+            for (Field field : OutputItem.class.getDeclaredFields()) {
+                if (field.isSynthetic() || Modifier.isStatic(field.getModifiers())) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Object value;
+                try {
+                    value = field.get(this);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalArgumentException(
+                            "output." + field.getName() + ": cannot be read for validation", e);
+                }
+                Range range = field.getAnnotation(Range.class);
+                if (range != null && value instanceof Number) {
+                    double number = ((Number) value).doubleValue();
+                    if (number < range.min() || number > range.max()) {
+                        return "output." + field.getName() + ": value " + value + " is out of range ["
+                                + describeBound(range.min()) + ", " + describeBound(range.max()) + "]";
+                    }
+                }
+                if (field.getAnnotation(NotEmpty.class) != null
+                        && (value == null || value.toString().trim().isEmpty())) {
+                    return "output." + field.getName() + ": must not be empty";
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Renders a {@code @Range} bound the way the operator wrote it in the annotation.
+         * {@code min()} and {@code max()} are declared {@code double}, so a stack-size bound of
+         * {@code 1} prints as {@code 1.0} unless it is trimmed - and the refusal message is read
+         * by someone comparing it against an integer they typed into a yml file.
+         *
+         * @param value the bound
+         * @return the bound without a redundant fractional part
+         */
+        private static String describeBound(double value) {
+            if (value == Math.rint(value) && !Double.isInfinite(value)
+                    && Math.abs(value) < (double) Long.MAX_VALUE) {
+                return Long.toString((long) value);
+            }
+            return Double.toString(value);
+        }
     }
 
     /**
@@ -352,9 +452,10 @@ public class RecipeConfig extends AbstractConfigEntity {
      * became the display name {@code {text=Blade}} and the recipe registered with no warning
      * (Codex P2 on pull request #22, measured). A compound value cannot be read as text, so it
      * is refused here like any other structural mismatch. Scalars are unaffected, which is why
-     * {@code material: ""} and {@code material: NOT_A_MATERIAL} still reach
-     * {@code Material.matchMaterial} and still report
-     * {@code Invalid output material for recipe: <name>}.
+     * {@code material: ""} and {@code material: NOT_A_MATERIAL} still bind, and are still judged
+     * afterwards rather than here: the empty one by the {@code @NotEmpty} the field declares
+     * ({@link OutputItem#describeConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable
+     * one by {@code Material.matchMaterial} as before.
      *
      * @param field the sub-key being bound, used in the failure message
      * @param value the parsed configuration value, never {@code null}

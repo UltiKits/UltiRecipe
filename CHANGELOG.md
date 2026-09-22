@@ -25,6 +25,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A recipe's `output.material` and `output.amount` are now checked against the constraints
+  declared on them (`@NotEmpty`, and `@Range(min = 1, max = 64)` inclusive at both ends). Neither
+  was checked by anything before: the framework validates only a configuration class's own
+  top-level keys and never recurses into a recipe entry, and this module added no check of its
+  own. **What changes for an operator:** an `output.amount` outside 1-64 used to register and
+  craft as written — `amount: 100` produced a stack of 100 — and is now refused with
+  `Invalid output for recipe: <name> - output.amount: value 100 is out of range [1, 64]`. It is
+  refused, not clamped: a server that relies on an out-of-range stack size must change that entry,
+  and will be told exactly which one. An empty or whitespace-only `output.material` was already
+  refused, but through `Material.matchMaterial` failing, so it produced the same
+  `Invalid output material for recipe: <name>` line a misspelled material produces; it now reports
+  `Invalid output for recipe: <name> - output.material: must not be empty`, so a blank field and a
+  typo are finally distinguishable in the log. In both cases only the offending entry is skipped —
+  every other recipe in the file still registers (UltiKits/UltiRecipe#14).
 - `/ul reload UltiRecipe` now reloads this module's configuration (`config/recipes.yml`) and
   refreshes its language files before the module re-registers its recipes. Previously this module
   replaced the framework's reload method, so neither step ran. UltiTools 6.3.0 also reports
@@ -46,6 +60,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `shape` or `ingredients` entirely, or supplies an `ingredients` block with nothing usable under
   it, is refused with `Invalid recipe definition for: <name>`, which names the entry
   (UltiKits/UltiRecipe#16).
+- 配方的 `output.material` 与 `output.amount` 现在会按其字段上声明的约束校验（`@NotEmpty`，以及两端均为闭区间的
+  `@Range(min = 1, max = 64)`）。此前这两条约束不被任何代码执行：框架只校验配置类自身的顶层键，不会递归进入配方条目，
+  而本模块也没有自己做检查。**对运维意味着什么：** 超出 1-64 的 `output.amount` 此前会照写注册并可合成——`amount: 100`
+  真的产出一组 100 个——现在会被拒绝，并输出
+  `Invalid output for recipe: <name> - output.amount: value 100 is out of range [1, 64]`。是拒绝而不是截断：
+  若某台服务器依赖超范围的堆叠数量，必须自行修改该条目，而日志会指明是哪一条。空的或只有空白字符的 `output.material`
+  此前也会被拒绝，但走的是 `Material.matchMaterial` 失败那条路，因此与材料名拼错输出同一行
+  `Invalid output material for recipe: <name>`；现在输出
+  `Invalid output for recipe: <name> - output.material: must not be empty`，留空与拼错终于可以在日志里区分。
+  两种情况都只跳过出问题的那一条，文件中其余配方照常注册（UltiKits/UltiRecipe#14）。
 - `/ul reload UltiRecipe` 现在会先重载本模块的配置（`config/recipes.yml`）并刷新其语言文件，再由本模块重新注册
   配方。此前本模块替换了框架的重载方法，这两步都不会执行。UltiTools 6.3.0 还会在此时报告
   `@ConditionalOnConfig` 漂移并输出框架自身的模块重载日志（UltiKits/UltiRecipe#11）。
