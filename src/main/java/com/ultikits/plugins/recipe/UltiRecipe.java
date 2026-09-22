@@ -37,7 +37,7 @@ public class UltiRecipe extends UltiToolsPlugin {
     }
 
     @Override
-    public void unregisterSelf() {
+    protected void onUnregister() {
         // Remove all custom recipes
         RecipeService recipeService = getContext().getBean(RecipeService.class);
         if (recipeService != null) {
@@ -48,7 +48,7 @@ public class UltiRecipe extends UltiToolsPlugin {
     }
 
     @Override
-    public void reloadSelf() {
+    protected void onReload() {
         // Reload recipes
         RecipeService recipeService = getContext().getBean(RecipeService.class);
         if (recipeService != null) {

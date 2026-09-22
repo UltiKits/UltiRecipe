@@ -23,13 +23,17 @@ for UAT execution and issue reconciliation — the public description of these f
   entry is parsed against, not one specific entry.
 - **Kind**, exactly these eight values: `command`, `config`, `event`, `gui`, `scheduled`,
   `placeholder`, `persistence`, `gate`. Each maps one-to-one onto a reconciliation-table line.
-  This module has no `event` rows (no `@EventListener` class), no `scheduled` rows (no
-  `@Scheduled` method), no `gui` rows (no GUI page class), no `placeholder` rows (no
+  This module has no `@EventListener` class and no `@Scheduled` method, but does carry two
+  `event`-Kind rows (see `## Lifecycle Hooks` below): `onUnregister()`/`onReload()` are
+  framework-invoked callbacks, not player-triggered commands or config reads, so `event` is the
+  closest-fitting Kind for a framework lifecycle hook the same way it would be for a Bukkit
+  `@EventListener` — this module has no `gui` rows (no GUI page class), no `placeholder` rows (no
   PlaceholderAPI expansion registered), and no `persistence` rows beyond the ordinary config-file
   contract already captured by the `config` rows below (the in-memory `registeredRecipes` set is
   rebuilt from `recipes.yml` on every `registerSelf()`, which is expected bookkeeping, not a
   persistence guarantee distinct from the config file itself) — all eight Kinds stay in the
-  vocabulary for cross-repository consistency even though four of them appear zero times below.
+  vocabulary for cross-repository consistency even though four of them (`gui`, `scheduled`,
+  `placeholder`, `persistence`) appear zero times below.
 - **Tier**, exactly three: `player`, `admin`, `internal`. Judged from what the feature is for,
   not from whether it carries a permission string. All three of this module's commands are
   `admin` — recipe management is a server-owner activity, not something an ordinary player does,
@@ -117,7 +121,7 @@ system, independent of whether an operator can query it through a command.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultirecipe.recipe.command-gate | Register the `RecipeCommand` bean (and therefore the entire `/recipe`/`/ultirecipe` command and its three sub-commands below) only if `enabled` is `true` at component-scan time; a change to this key takes effect only on a full server restart, not on `/recipe reload` or `/ul reload` (`/ul reload` additionally never reaches `ConditionalRegistrationEvaluator`'s own drift report for this module at all — see `## Reload Behaviour Outside /recipe` below, `UltiKits/UltiRecipe#11`) | gate | `enabled` in `plugins/UltiTools/UltiRecipe/config/recipes.yml`, applied only on a full server restart | n/a | n/a | admin | brief | RecipeCommand#RecipeCommand |
+| ultirecipe.recipe.command-gate | Register the `RecipeCommand` bean (and therefore the entire `/recipe`/`/ultirecipe` command and its three sub-commands below) only if `enabled` is `true` at component-scan time; a change to this key takes effect only on a full server restart, not on `/recipe reload` or `/ul reload` — see `## Reload Behaviour Outside /recipe` below for what `/ul reload` now does since `UltiKits/UltiRecipe#11`'s lifecycle-hook migration | gate | `enabled` in `plugins/UltiTools/UltiRecipe/config/recipes.yml`, applied only on a full server restart | n/a | n/a | admin | brief | RecipeCommand#RecipeCommand |
 | ultirecipe.recipe.count | Show the number of currently registered custom recipes | command | `/recipe count` | ultirecipe.admin | both | admin | none | RecipeCommand#showCount |
 | ultirecipe.recipe.list | List every currently registered custom recipe name, or a "no recipes" message if none are registered | command | `/recipe list` | ultirecipe.admin | both | admin | brief | RecipeCommand#listRecipes |
 | ultirecipe.recipe.reload | Remove every currently-registered custom recipe from Bukkit's crafting system, then re-register the SAME set held in the already-loaded `RecipeConfig` bean's in-memory `recipes` map. Despite the command's name and the README's "hot reload without restart" description, this command never re-reads `config/recipes.yml` from disk — `RecipeService#reloadRecipes` calls neither `AbstractConfigEntity#reload()` nor `#init(...)` on the config bean, so an edit made to the file while the server is running has no effect until a full restart. A known product defect, UltiKits/UltiRecipe#12, not fixed here per this plan's zero-new-code rule | command | `/recipe reload` | ultirecipe.admin | both | admin | detailed | RecipeCommand#reloadRecipes, RecipeService#reloadRecipes |
@@ -125,18 +129,43 @@ system, independent of whether an operator can query it through a command.
 
 ## Reload Behaviour Outside `/recipe`
 
-`UltiRecipe#reloadSelf()` is the hook the framework's own `/ul reload` command invokes (see
-`UltiToolsCommands`/`PluginManager` in the framework repository). It overrides
-`UltiToolsPlugin#reloadSelf()` without calling `super.reloadSelf()`, so `/ul reload` on this
-module never calls `ConfigManager#reloadConfigs` (config is not re-read from disk for this
-module either, the same net effect as `ultirecipe.recipe.reload`'s own defect but through a
-different path), never re-creates the module's `language` object, and never reports
-`@ConditionalOnConfig` drift for either of this module's two gates above. A known product defect,
-UltiKits/UltiRecipe#11, filed before this cataloguing pass and not fixed here. This is prose
-context for the two `-gate` rows above, not a separate row: `/ul reload`'s dispatch to
-`reloadSelf()` is the framework's own command, not a `@CmdMapping` site in this repository, so no
-`command`-Kind row is added here for it (the same "do not add a row for a command this repository
-does not itself map" boundary the framework's own `FEATURES.md` states for `/upm help`).
+**Fixed by `UltiKits/UltiRecipe#11`'s wave-0 lifecycle-hook migration (this pull request).**
+Before this migration, `UltiRecipe` overrode `UltiToolsPlugin#reloadSelf()`/`#unregisterSelf()`
+directly without calling `super`, completely replacing the framework's own steps: on reload,
+`ConfigManager#reloadConfigs` and the module's `language` object refresh never ran for this module;
+on `/upm uninstall UltiRecipe`, command and listener unregistration were both skipped, so the
+`/recipe` command stayed registered until the server restarted (this module registers no
+listeners). Server shutdown was unaffected: there the framework unregistered listeners and commands
+itself. As of 6.3.0,
+`reloadSelf()`/`unregisterSelf()` are `final` template methods on `UltiToolsPlugin`; this module
+now overrides the extension-point hooks `onReload()`/`onUnregister()` instead, with the same
+bodies moved verbatim. `/ul reload UltiRecipe` (the framework's own command, not a
+`@CmdMapping` site in this repository, so no `command`-Kind row is added here for it — the same
+"do not add a row for a command this repository does not itself map" boundary the framework's own
+`FEATURES.md` states for `/upm help`) now runs, in order: `ConfigManager#reloadConfigs`, the
+module's `language` object refresh, `ConditionalRegistrationEvaluator`'s drift report for either
+of this module's two gates above, the framework's own `Module 'UltiRecipe' reloaded.` INFO line,
+and finally `onReload()` — which re-registers this module's recipes and logs its own count line,
+exactly as before. (The drift report and the `Module 'UltiRecipe' reloaded.` line are new in
+UltiTools 6.3.0; they did not exist in 6.2.5.) Unloading the module (`/upm uninstall UltiRecipe`
+or server shutdown, both of which call `unregisterSelf()`) now runs `onUnregister()` (removing
+every custom recipe, as before) followed by the framework's own command unregistration and then
+listener unregistration for this module. See the two new
+`ultirecipe.lifecycle.*` rows below for the hooks themselves.
+
+## Lifecycle Hooks
+
+`UltiRecipe#onUnregister()`/`#onReload()` are the extension-point hooks the framework's now-`final`
+`UltiToolsPlugin#unregisterSelf()`/`#reloadSelf()` invoke (see `## Reload Behaviour Outside
+/recipe` above for the full sequencing). Neither hook is reachable through a command this
+repository maps itself — both are always invoked by the framework, either when the module is
+unloaded (`/upm uninstall UltiRecipe`, or server shutdown) or when `/ul reload UltiRecipe` runs — so both rows below are `event`-Kind, not
+`command`-Kind.
+
+| ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
+|---|---|---|---|---|---|---|---|---|
+| ultirecipe.lifecycle.reload | Re-register this module's currently-configured recipes and log the resulting count when the module is reloaded via the framework's own `/ul reload` command | event | `/ul reload UltiRecipe` (framework calls `reloadSelf()`, which runs its own steps first, then invokes this hook) | n/a | n/a | admin | brief | UltiRecipe#onReload |
+| ultirecipe.lifecycle.unload | Remove every custom recipe this module registered from Bukkit's crafting system when the module is unloaded | event | `/upm uninstall UltiRecipe`, or server shutdown (framework calls `unregisterSelf()`, which invokes this hook before its own command/listener cleanup) | n/a | n/a | admin | brief | UltiRecipe#onUnregister |
 
 ## Configuration
 
