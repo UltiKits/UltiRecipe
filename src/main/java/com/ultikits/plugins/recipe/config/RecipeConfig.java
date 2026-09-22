@@ -394,38 +394,4 @@ public class RecipeConfig extends AbstractConfigEntity {
         }
         return "the text '" + value + "'";
     }
-
-    /**
-     * Initialize default values after construction.
-     * Called by the framework after instantiation.
-     */
-    public void initDefaults() {
-        if (recipes == null || recipes.isEmpty()) {
-            recipes = new HashMap<>();
-            // Add example recipe
-            RecipeDefinition example = new RecipeDefinition();
-            
-            OutputItem output = new OutputItem();
-            output.setMaterial("EGG");
-            output.setAmount(1);
-            output.setName("&e&l金苹果蛋");
-            List<String> lore = new ArrayList<>();
-            lore.add("&7由苹果和木头合成的神奇蛋");
-            output.setLore(lore);
-            example.setOutput(output);
-            
-            List<String> shape = new ArrayList<>();
-            shape.add("xxx");
-            shape.add("xyx");
-            shape.add("y y");
-            example.setShape(shape);
-            
-            Map<String, String> ingredients = new HashMap<>();
-            ingredients.put("x", "APPLE");
-            ingredients.put("y", "DARK_OAK_WOOD");
-            example.setIngredients(ingredients);
-        
-            recipes.put("golden_egg", example);
-        }
-    }
 }

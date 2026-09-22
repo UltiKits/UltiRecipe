@@ -7,6 +7,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- `RecipeConfig#initDefaults()`, which claimed in its own javadoc to be "called by the framework
+  after instantiation" and to seed an example `golden_egg` recipe on first run. Nothing ever called
+  it, so no install has ever received that example; the claim is gone rather than the behaviour. A
+  fresh install still writes `config/recipes.yml` with `enabled: true` and an empty `recipes: {}`
+  map, exactly as before — nothing an operator can observe changes. The README bullet that promised
+  an auto-generated example configuration was reworded to say the same thing. **Shipping an example
+  recipe on first run is not rejected, only deferred: it is tracked as UltiKits/UltiRecipe#23**
+  (UltiKits/UltiRecipe#13).
+- `RecipeConfig#initDefaults()` 已删除。该方法的 javadoc 自称「由框架在实例化后调用」并会在首次运行时写入一条
+  `golden_egg` 示例配方，但从未有任何代码调用它，因此没有任何一次安装真正拿到过这条示例；这里删掉的是那句假声明，
+  不是行为。全新安装写出的 `config/recipes.yml` 仍然是 `enabled: true` 加一个空的 `recipes: {}`，与此前完全一致，
+  运维看不到任何差别。README 中「自动生成示例配置」那一条也改为与实际一致的说法。**「随插件附带一份示例配方」并未被
+  否决，只是延后：由 UltiKits/UltiRecipe#23 跟踪**（UltiKits/UltiRecipe#13）。
+
 ### Fixed
 
 - `/ul reload UltiRecipe` now reloads this module's configuration (`config/recipes.yml`) and
