@@ -2,6 +2,8 @@ package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
 import com.ultikits.plugins.recipe.config.RecipeConfig;
+import com.ultikits.ultitools.annotations.config.NotEmpty;
+import com.ultikits.ultitools.annotations.config.Range;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import com.ultikits.ultitools.interfaces.impl.pasers.DefaultConfigParser;
 
@@ -22,6 +24,9 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,6 +65,24 @@ import static org.mockito.Mockito.when;
  */
 @DisplayName("RecipeService — loading a real recipes.yml (UltiKits/UltiRecipe#16)")
 class RecipeYamlLoadTest {
+
+    /**
+     * A well-formed entry, used by {@code NestedOutputConstraints} as the surviving neighbour
+     * beside each violating one. It lives on the enclosing class for the same reason
+     * {@code unbindableEntries()} does: a {@code @Nested} class is an inner class.
+     */
+    private static final String GOOD_ENTRY =
+            "  good:\n"
+            + "    output:\n"
+            + "      material: DIAMOND_SWORD\n"
+            + "      amount: 1\n"
+            + "    shape:\n"
+            + "      - \" D \"\n"
+            + "      - \" D \"\n"
+            + "      - \" S \"\n"
+            + "    ingredients:\n"
+            + "      D: DIAMOND\n"
+            + "      S: STICK\n";
 
     /** The legal mixed-case entry from the issue body. */
     private static final String LEGAL_SWORD =
@@ -225,9 +248,19 @@ class RecipeYamlLoadTest {
             assertThat(result.getItemMeta().getLore()).containsExactly("\u00a77A mighty sword");
         }
 
+        /**
+         * Shape 2 of UltiKits/UltiRecipe#16's four, re-pointed by UltiKits/UltiRecipe#14. When
+         * this case was first written the entry registered a stack of 100 unclamped, and the
+         * assertion said so, because the declared {@code @Range(min = 1, max = 64)} on
+         * {@code OutputItem.amount} was never evaluated by anything. It is evaluated now, so the
+         * same file refuses the entry instead. The full behaviour - a violating entry skipped
+         * beside a valid one that still loads, both bounds inclusive - lives in
+         * {@code NestedOutputConstraints} below; this case stays here so the four shapes the
+         * original issue was reproduced with remain readable as a set.
+         */
         @Test
-        @DisplayName("2 — output.amount 100 registers unclamped (the declared @Range is #14, not this fix)")
-        void amountAboveTheDeclaredRangeRegisters() throws Exception {
+        @DisplayName("2 — output.amount 100 is refused by the declared @Range (UltiKits/UltiRecipe#14)")
+        void amountAboveTheDeclaredRangeIsRefused() throws Exception {
             givenRecipesYml(
                     "recipes:\n"
                     + "  big_stack:\n"
@@ -241,8 +274,10 @@ class RecipeYamlLoadTest {
                     + "    ingredients:\n"
                     + "      D: DIAMOND\n");
 
-            assertThat(service.initRecipes()).isEqualTo(1);
-            assertThat(registered("big_stack").getResult().getAmount()).isEqualTo(100);
+            assertThat(service.initRecipes()).isZero();
+            assertThat(service.getRecipeList()).isEmpty();
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: big_stack - output.amount: value 100 is out of range [1, 64]");
         }
 
         @Test
@@ -554,17 +589,21 @@ class RecipeYamlLoadTest {
         }
 
         /**
-         * The boundary of "nothing usable": a material that is present but unusable is not folded
-         * into the null guard. Both `material: ""` and `material: NOT_A_MATERIAL` produce
-         * `Invalid output material for recipe: <name>`, which names the offending sub-key. Each
-         * is pinned by its own test here, so the boundary cannot move without one going red.
+         * The boundary of "nothing usable" has three sides now, not two, and this case moved
+         * across one of them on purpose (UltiKits/UltiRecipe#14). An {@code output} block with no
+         * {@code material} at all still binds to a null definition-output and reports
+         * {@code Invalid recipe definition for: <name>}. A material that is present and unusable
+         * still reports {@code Invalid output material for recipe: <name>} - pinned by the case
+         * below this one, which is the control proving only the empty side moved. An EMPTY
+         * material used to report that same second message, because an empty string also fails
+         * {@code Material.matchMaterial}; it now reports the {@code @NotEmpty} declared on the
+         * field, which names the sub-key. The two mistakes were indistinguishable in the log
+         * before: an operator who left {@code material:} blank and an operator who misspelled
+         * {@code DIAMOND_SWORD} read the identical line.
          */
         @Test
-        @DisplayName("an empty material string keeps that message too - the other shape the boundary defends")
-        void emptyMaterialStringKeepsTheSpecificMessage() throws Exception {
-            // Pinned because a wave-2 hardening to `getMaterial() == null || isEmpty()` would
-            // move this shape across the boundary the binder's javadoc defends, from
-            // `Invalid output material` to `Invalid recipe definition`, with the suite green.
+        @DisplayName("an empty material string now names the declared @NotEmpty, not the match failure")
+        void emptyMaterialStringNamesTheDeclaredConstraint() throws Exception {
             givenRecipesYml(
                     "recipes:\n"
                     + "  blank_material:\n"
@@ -580,7 +619,8 @@ class RecipeYamlLoadTest {
             assertThat(service.initRecipes()).isZero();
             assertThat(service.getRecipeList()).isEmpty();
             verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
-            assertThat(warnings()).containsExactly("Invalid output material for recipe: blank_material");
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: blank_material - output.material: must not be empty");
         }
 
         @Test
@@ -811,6 +851,172 @@ class RecipeYamlLoadTest {
 
             assertThat(service.initRecipes()).isEqualTo(1);
             assertThat(registered("mixed").getResult().getAmount()).isEqualTo(3);
+        }
+    }
+
+    // --- the declared constraints on OutputItem's own fields (UltiKits/UltiRecipe#14) -------
+
+    /**
+     * {@code OutputItem.material} declares {@code @NotEmpty} and {@code OutputItem.amount}
+     * declares {@code @Range(min = 1, max = 64)}, and until UltiKits/UltiRecipe#14 neither was
+     * ever evaluated: the framework's {@code AbstractConfigEntity#validateFields()} walks only
+     * the {@code @ConfigEntry} fields on the entity itself and never recurses into a map value's
+     * object graph, and {@code RecipeService} applied no bound check of its own.
+     *
+     * <p>Every case here puts the violating entry BESIDE a valid one in the same file, because
+     * the two halves of the contract are separable and a test that only wrote the bad entry
+     * would prove just one of them: the violating entry must be skipped, AND the rest of the
+     * file must still register. A refusal that took the whole file down with it would satisfy
+     * the first half and fail the operator.
+     *
+     * <p>Like the rest of this class, nothing here names the code that performs the check, so
+     * the revert proof's RED is a behaviour failure rather than a compilation error.
+     */
+    @Nested
+    @DisplayName("the declared @NotEmpty/@Range on OutputItem are enforced (UltiKits/UltiRecipe#14)")
+    class NestedOutputConstraints {
+
+        private String withNeighbour(String offendingEntry) {
+            return "recipes:\n" + GOOD_ENTRY + offendingEntry;
+        }
+
+        private String entryWithAmount(String name, String amount) {
+            return "  " + name + ":\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "      amount: " + amount + "\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n";
+        }
+
+        @Test
+        @DisplayName("an amount above the declared maximum is skipped; its neighbour still loads")
+        void amountAboveTheMaximumIsSkippedBesideAValidRecipe() throws Exception {
+            givenRecipesYml(withNeighbour(entryWithAmount("big_stack", "100")));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: big_stack - output.amount: value 100 is out of range [1, 64]");
+            assertThat(registered("good").getResult().getType()).isEqualTo(Material.DIAMOND_SWORD);
+        }
+
+        @Test
+        @DisplayName("an amount below the declared minimum is skipped; its neighbour still loads")
+        void amountBelowTheMinimumIsSkippedBesideAValidRecipe() throws Exception {
+            givenRecipesYml(withNeighbour(entryWithAmount("zero_stack", "0")));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: zero_stack - output.amount: value 0 is out of range [1, 64]");
+        }
+
+        /**
+         * The bounds are inclusive, the same way the framework's own {@code @Range} check is
+         * ({@code num < min || num > max}). Without this case a check written one comparison too
+         * strict would refuse a legal stack of 64 and every other case here would still pass.
+         */
+        @Test
+        @DisplayName("both declared bounds are inclusive - 1 and 64 register")
+        void theDeclaredBoundsAreInclusive() throws Exception {
+            givenRecipesYml("recipes:\n"
+                    + entryWithAmount("at_min", "1")
+                    + entryWithAmount("at_max", "64"));
+
+            assertThat(service.initRecipes()).isEqualTo(2);
+            assertThat(service.getRecipeList()).containsExactlyInAnyOrder("at_min", "at_max");
+            assertThat(warnings()).isEmpty();
+            assertThat(registered("at_min").getResult().getAmount()).isEqualTo(1);
+            assertThat(registered("at_max").getResult().getAmount()).isEqualTo(64);
+        }
+
+        @Test
+        @DisplayName("an empty material is skipped naming the field; its neighbour still loads")
+        void emptyMaterialIsSkippedBesideAValidRecipe() throws Exception {
+            givenRecipesYml(withNeighbour(
+                    "  blank:\n"
+                    + "    output:\n"
+                    + "      material: \"\"\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: blank - output.material: must not be empty");
+            assertThat(registered("good").getResult().getType()).isEqualTo(Material.DIAMOND_SWORD);
+        }
+
+        /**
+         * {@code @NotEmpty}'s own semantics are "null, or empty after trimming" - the framework
+         * spells that out in {@code isNotEmptyViolation}. A whitespace-only material reaches
+         * exactly the same refusal, and it is worth its own case because it is the one spelling
+         * that a plain {@code isEmpty()} check would let through into
+         * {@code Material.matchMaterial}.
+         */
+        @Test
+        @DisplayName("a whitespace-only material is empty too, per @NotEmpty's own semantics")
+        void whitespaceOnlyMaterialIsSkipped() throws Exception {
+            givenRecipesYml(withNeighbour(
+                    "  spaces:\n"
+                    + "    output:\n"
+                    + "      material: \"   \"\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Invalid output for recipe: spaces - output.material: must not be empty");
+        }
+
+        /**
+         * The coverage guard. The reader this fix adds implements the two constraint annotations
+         * {@code OutputItem} actually declares; the framework's {@code config} annotation package
+         * carries two more ({@code @Size}, {@code @Pattern}) that nothing here declares and the
+         * reader therefore does not read.
+         *
+         * <p>A javadoc sentence saying so would be a silent trap: a later author adding
+         * {@code @Size(max = 5)} to {@code lore} would see the sibling annotations working and
+         * assume theirs does too, which is the declared-but-not-delivered defect class this whole
+         * change exists to remove. This case turns that into a red test at the moment the
+         * annotation is added, instead of a surprise on a server.
+         *
+         * <p>It names no module class beyond {@code OutputItem} itself, so it is green both
+         * before and after the fix - it guards the fix's scope, it does not prove it.
+         */
+        @Test
+        @DisplayName("OutputItem declares no constraint annotation beyond the two that are read")
+        void onlyTheConstraintsThisModuleReadsAreDeclared() {
+            List<String> unreadable = new ArrayList<>();
+            for (Field field : RecipeConfig.OutputItem.class.getDeclaredFields()) {
+                for (Annotation annotation : field.getAnnotations()) {
+                    Class<? extends Annotation> type = annotation.annotationType();
+                    if (!"com.ultikits.ultitools.annotations.config".equals(type.getPackage().getName())) {
+                        continue;
+                    }
+                    if (type != NotEmpty.class && type != Range.class) {
+                        unreadable.add(field.getName() + " @" + type.getSimpleName());
+                    }
+                }
+            }
+            assertThat(unreadable)
+                    .as("a constraint annotation on OutputItem that RecipeService does not enforce "
+                            + "is a silent no-op - add it to the reader, or take it off the field")
+                    .isEmpty();
         }
     }
 }
