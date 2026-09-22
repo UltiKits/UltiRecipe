@@ -1012,9 +1012,19 @@ class RecipeYamlLoadTest {
          * Widening the walk to {@code RecipeConfig} and every class it declares removes the class
          * of defect rather than the one instance of it (gate 1, WR-04).
          *
+         * <p>A constraint being read is necessary and not sufficient, so the walk makes a second
+         * assertion (gate 1 IN-02). {@code @Range} is gated on {@code value instanceof Number} by
+         * this module's reader and by the framework's own {@code isRangeViolation} alike, so
+         * {@code @Range(min = 1, max = 3)} on {@code lore} - a plausible confusion with
+         * {@code @Size}, which is the annotation that actually takes a length - is read, skipped,
+         * and enforces nothing. The first assertion cannot see that, because {@code @Range} on
+         * {@code OutputItem} is by construction "read". The two assertions together are what makes
+         * the guard cover the defect rather than one of its spellings.
+         *
          * <p>It is green both before and after the fix: it guards the fix's scope, it does not
-         * prove it. That the widened walk can actually fail is recorded separately, as
-         * {@code revert-proofs/w2/UltiRecipe-14-MUTATION-recipedefinition-size-RED.log}.
+         * prove it. That each assertion can actually fail is recorded separately, as
+         * {@code revert-proofs/w2/UltiRecipe-14-MUTATION-recipedefinition-size-RED.log} and
+         * {@code …-MUTATION-range-on-lore-RED.log}.
          */
         @Test
         @DisplayName("every constraint declared in this config's object graph is read by something")
@@ -1024,6 +1034,7 @@ class RecipeYamlLoadTest {
             graph.addAll(Arrays.asList(RecipeConfig.class.getDeclaredClasses()));
 
             List<String> readByNobody = new ArrayList<>();
+            List<String> unjudgeable = new ArrayList<>();
             for (Class<?> owner : graph) {
                 for (Field field : owner.getDeclaredFields()) {
                     for (Annotation annotation : field.getAnnotations()) {
@@ -1033,13 +1044,16 @@ class RecipeYamlLoadTest {
                                 || !"com.ultikits.ultitools.annotations.config".equals(declaring.getName())) {
                             continue;
                         }
+                        String site = owner.getSimpleName() + "." + field.getName()
+                                + " @" + type.getSimpleName();
                         boolean theFrameworkReadsIt = owner == RecipeConfig.class
                                 && field.isAnnotationPresent(ConfigEntry.class);
                         boolean thisModuleReadsIt = owner == RecipeConfig.OutputItem.class
                                 && (type == NotEmpty.class || type == Range.class);
                         if (!theFrameworkReadsIt && !thisModuleReadsIt) {
-                            readByNobody.add(
-                                    owner.getSimpleName() + "." + field.getName() + " @" + type.getSimpleName());
+                            readByNobody.add(site);
+                        } else if (type == Range.class && !judgeableAsANumber(field.getType())) {
+                            unjudgeable.add(site + " on " + field.getType().getSimpleName());
                         }
                     }
                 }
@@ -1050,6 +1064,27 @@ class RecipeYamlLoadTest {
                             + "@NotEmpty/@Range on OutputItem - so teach the reader about it, or take "
                             + "it off the field")
                     .isEmpty();
+            assertThat(unjudgeable)
+                    .as("@Range is gated on `value instanceof Number` by this module's reader and by "
+                            + "the framework's own isRangeViolation alike, so on a non-numeric field it "
+                            + "is read and then silently skipped - the same no-op with an extra step. "
+                            + "@Size is the annotation that takes a length")
+                    .isEmpty();
+        }
+
+        /**
+         * Whether a field's declared type can reach {@code @Range}'s {@code value instanceof
+         * Number} gate once reflection has boxed it. Primitives box to a {@code Number} subclass
+         * and so qualify, apart from {@code boolean} and {@code char}, whose boxes do not extend
+         * {@code Number}.
+         *
+         * @param type the field's declared type
+         * @return whether a {@code @Range} on a field of this type would ever be evaluated
+         */
+        private boolean judgeableAsANumber(Class<?> type) {
+            return Number.class.isAssignableFrom(type)
+                    || type == byte.class || type == short.class || type == int.class
+                    || type == long.class || type == float.class || type == double.class;
         }
 
         /**
