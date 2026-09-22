@@ -2,6 +2,7 @@ package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
 import com.ultikits.plugins.recipe.config.RecipeConfig;
+import com.ultikits.ultitools.annotations.ConfigEntry;
 import com.ultikits.ultitools.annotations.config.NotEmpty;
 import com.ultikits.ultitools.annotations.config.Range;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
@@ -984,39 +985,87 @@ class RecipeYamlLoadTest {
         }
 
         /**
-         * The coverage guard. The reader this fix adds implements the two constraint annotations
-         * {@code OutputItem} actually declares; the framework's {@code config} annotation package
-         * carries two more ({@code @Size}, {@code @Pattern}) that nothing here declares and the
-         * reader therefore does not read.
+         * The coverage guard: every constraint annotation anywhere in this configuration's object
+         * graph must be read by somebody, and this case names who.
          *
-         * <p>A javadoc sentence saying so would be a silent trap: a later author adding
-         * {@code @Size(max = 5)} to {@code lore} would see the sibling annotations working and
-         * assume theirs does too, which is the declared-but-not-delivered defect class this whole
-         * change exists to remove. This case turns that into a red test at the moment the
-         * annotation is added, instead of a surprise on a server.
+         * <p>There are exactly two readers, and between them they do not cover the graph:
+         * <pre>
+         * class               reached by                          reads config-package annotations on
+         * -----------------   ---------------------------------   -----------------------------------
+         * RecipeConfig        AbstractConfigEntity#validateFields  its @ConfigEntry fields, all four
+         *                                                          annotations
+         * RecipeConfig        - (the framework walks @ConfigEntry  nothing: a constraint on a field
+         *   non-@ConfigEntry    fields only)                       the framework never visits is read
+         *   field                                                  by nobody
+         * OutputItem          RecipeService#registerRecipe, via    @NotEmpty and @Range only
+         *                     describeConstraintViolation()
+         * RecipeDefinition    - (nothing reads it)                 nothing
+         * </pre>
          *
-         * <p>It names no module class beyond {@code OutputItem} itself, so it is green both
-         * before and after the fix - it guards the fix's scope, it does not prove it.
+         * <p>The first revision of this case walked {@code OutputItem} alone, which left the row
+         * that matters most uncovered. {@code RecipeDefinition} is unreachable by the framework's
+         * validator for exactly the reason {@code OutputItem} is - {@code validateFields()} never
+         * recurses into a nested object graph - so a later author following the direction
+         * UltiKits/UltiRecipe#14 sets, and replacing {@code registerRecipe}'s hand-written
+         * three-row shape check with {@code @Size(min = 3, max = 3)} on
+         * {@code RecipeDefinition.shape}, would ship a fresh silent no-op with the suite green.
+         * Widening the walk to {@code RecipeConfig} and every class it declares removes the class
+         * of defect rather than the one instance of it (gate 1, WR-04).
+         *
+         * <p>It is green both before and after the fix: it guards the fix's scope, it does not
+         * prove it. That the widened walk can actually fail is recorded separately, as
+         * {@code revert-proofs/w2/UltiRecipe-14-MUTATION-recipedefinition-size-RED.log}.
          */
         @Test
-        @DisplayName("OutputItem declares no constraint annotation beyond the two that are read")
-        void onlyTheConstraintsThisModuleReadsAreDeclared() {
-            List<String> unreadable = new ArrayList<>();
-            for (Field field : RecipeConfig.OutputItem.class.getDeclaredFields()) {
-                for (Annotation annotation : field.getAnnotations()) {
-                    Class<? extends Annotation> type = annotation.annotationType();
-                    if (!"com.ultikits.ultitools.annotations.config".equals(type.getPackage().getName())) {
-                        continue;
-                    }
-                    if (type != NotEmpty.class && type != Range.class) {
-                        unreadable.add(field.getName() + " @" + type.getSimpleName());
+        @DisplayName("every constraint declared in this config's object graph is read by something")
+        void everyDeclaredConstraintIsReadBySomething() {
+            List<Class<?>> graph = new ArrayList<>();
+            graph.add(RecipeConfig.class);
+            graph.addAll(Arrays.asList(RecipeConfig.class.getDeclaredClasses()));
+
+            List<String> readByNobody = new ArrayList<>();
+            for (Class<?> owner : graph) {
+                for (Field field : owner.getDeclaredFields()) {
+                    for (Annotation annotation : field.getAnnotations()) {
+                        Class<? extends Annotation> type = annotation.annotationType();
+                        Package declaring = type.getPackage();
+                        if (declaring == null
+                                || !"com.ultikits.ultitools.annotations.config".equals(declaring.getName())) {
+                            continue;
+                        }
+                        boolean theFrameworkReadsIt = owner == RecipeConfig.class
+                                && field.isAnnotationPresent(ConfigEntry.class);
+                        boolean thisModuleReadsIt = owner == RecipeConfig.OutputItem.class
+                                && (type == NotEmpty.class || type == Range.class);
+                        if (!theFrameworkReadsIt && !thisModuleReadsIt) {
+                            readByNobody.add(
+                                    owner.getSimpleName() + "." + field.getName() + " @" + type.getSimpleName());
+                        }
                     }
                 }
             }
-            assertThat(unreadable)
-                    .as("a constraint annotation on OutputItem that RecipeService does not enforce "
-                            + "is a silent no-op - add it to the reader, or take it off the field")
+            assertThat(readByNobody)
+                    .as("a constraint annotation nothing reads is a silent no-op. The framework reads "
+                            + "only RecipeConfig's own @ConfigEntry fields, and this module reads only "
+                            + "@NotEmpty/@Range on OutputItem - so teach the reader about it, or take "
+                            + "it off the field")
                     .isEmpty();
+        }
+
+        /**
+         * The graph the guard above walks is not empty and not a singleton - a walk that found no
+         * class at all, or only {@code RecipeConfig}, would pass the guard for the wrong reason
+         * and look identical in the report.
+         */
+        @Test
+        @DisplayName("the guard's walk reaches both nested classes, not just the entity")
+        void theGuardWalksBothNestedClasses() {
+            List<Class<?>> declared = Arrays.asList(RecipeConfig.class.getDeclaredClasses());
+
+            assertThat(declared)
+                    .as("if either nested class stops being reached, the guard above silently "
+                            + "narrows back to what WR-04 found")
+                    .contains(RecipeConfig.OutputItem.class, RecipeConfig.RecipeDefinition.class);
         }
     }
 }
