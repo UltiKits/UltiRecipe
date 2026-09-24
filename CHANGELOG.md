@@ -7,6 +7,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Language keys were renamed from Chinese sentences to ASCII keys (for example `recipe.help.header`).
+  An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
+  the new keys; until then the renamed messages show the new built-in text. A server whose language
+  files were never edited needs no action.
+- 语言键已从中文句子改为 ASCII 键（例如 `recipe.help.header`）。改过本模块 `lang/en.json` 或
+  `lang/zh.json` 的运维需要把改动重新套到新键上；在此之前，这些消息显示新的内置文本。从未改过语言文件的服务器无需任何操作。
+
 ### Removed
 
 - `RecipeConfig#initDefaults()`, which claimed in its own javadoc to be "called by the framework

@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 @CmdExecutor(
     alias = {"recipe", "ultirecipe"},
     permission = "ultirecipe.admin",
-    description = "管理自定义配方"
+    description = "recipe.command.description"
 )
 @ConditionalOnConfig(value = "config/recipes.yml", path = "enabled")
 public class RecipeCommand extends BaseCommandExecutor {
@@ -59,15 +59,15 @@ public class RecipeCommand extends BaseCommandExecutor {
         List<String> recipes = recipeService.getRecipeList();
 
         if (recipes == null || recipes.isEmpty()) {
-            sender.sendMessage(i18n("§7没有已注册的配方"));
+            sender.sendMessage(i18n("recipe.list.empty"));
             return;
         }
 
-        sender.sendMessage(i18n("§6=== 已注册的配方 ==="));
+        sender.sendMessage(i18n("recipe.list.header"));
         for (String recipe : recipes) {
             sender.sendMessage("§7- §f" + recipe);
         }
-        sender.sendMessage(String.format(i18n("§7共 §f%d §7个配方"), recipes.size()));
+        sender.sendMessage(String.format(i18n("recipe.list.total"), recipes.size()));
     }
 
     /**
@@ -76,7 +76,7 @@ public class RecipeCommand extends BaseCommandExecutor {
     @CmdMapping(format = "reload")
     public void reloadRecipes(@CmdSender CommandSender sender) {
         int count = recipeService.reloadRecipes();
-        sender.sendMessage(String.format(i18n("§a配方已重载！共 %d 个配方"), count));
+        sender.sendMessage(String.format(i18n("recipe.reload.success"), count));
     }
 
     /**
@@ -85,15 +85,15 @@ public class RecipeCommand extends BaseCommandExecutor {
     @CmdMapping(format = "count")
     public void showCount(@CmdSender CommandSender sender) {
         int count = recipeService.getRecipeCount();
-        sender.sendMessage(String.format(i18n("§7当前已注册 §f%d §7个配方"), count));
+        sender.sendMessage(String.format(i18n("recipe.count.current"), count));
     }
 
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(i18n("§6=== UltiRecipe 帮助 ==="));
-        sender.sendMessage(i18n("§e/recipe list §7- 列出所有配方"));
-        sender.sendMessage(i18n("§e/recipe reload §7- 重载配方配置"));
-        sender.sendMessage(i18n("§e/recipe count §7- 显示配方数量"));
+        sender.sendMessage(i18n("recipe.help.header"));
+        sender.sendMessage(i18n("recipe.help.list"));
+        sender.sendMessage(i18n("recipe.help.reload"));
+        sender.sendMessage(i18n("recipe.help.count"));
     }
 
     @Override

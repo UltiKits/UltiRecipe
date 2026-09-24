@@ -1,17 +1,17 @@
 {
-  "UltiRecipe 已启用！": "UltiRecipe 已启用！",
-  "UltiRecipe 已禁用！": "UltiRecipe 已禁用！",
-  "已注册 %d 个自定义配方": "已注册 %d 个自定义配方",
-  "配方已重载，共 %d 个配方": "配方已重载，共 %d 个配方",
+  "recipe.log.enabled": "UltiRecipe 已启用！",
+  "recipe.log.disabled": "UltiRecipe 已禁用！",
+  "recipe.log.registered_count": "已注册 %d 个自定义配方",
+  "recipe.log.reloaded_count": "配方已重载，共 %d 个配方",
 
-  "§7没有已注册的配方": "§7没有已注册的配方",
-  "§6=== 已注册的配方 ===": "§6=== 已注册的配方 ===",
-  "§7共 §f%d §7个配方": "§7共 §f%d §7个配方",
-  "§a配方已重载！共 %d 个配方": "§a配方已重载！共 %d 个配方",
-  "§7当前已注册 §f%d §7个配方": "§7当前已注册 §f%d §7个配方",
+  "recipe.list.empty": "§7没有已注册的配方",
+  "recipe.list.header": "§6=== 已注册的配方 ===",
+  "recipe.list.total": "§7共 §f%d §7个配方",
+  "recipe.reload.success": "§a配方已重载！共 %d 个配方",
+  "recipe.count.current": "§7当前已注册 §f%d §7个配方",
 
-  "§6=== UltiRecipe 帮助 ===": "§6=== UltiRecipe 帮助 ===",
-  "§e/recipe list §7- 列出所有配方": "§e/recipe list §7- 列出所有配方",
-  "§e/recipe reload §7- 重载配方配置": "§e/recipe reload §7- 重载配方配置",
-  "§e/recipe count §7- 显示配方数量": "§e/recipe count §7- 显示配方数量"
+  "recipe.help.header": "§6=== UltiRecipe 帮助 ===",
+  "recipe.help.list": "§e/recipe list §7- 列出所有配方",
+  "recipe.help.reload": "§e/recipe reload §7- 重载配方配置",
+  "recipe.help.count": "§e/recipe count §7- 显示配方数量"
 }
