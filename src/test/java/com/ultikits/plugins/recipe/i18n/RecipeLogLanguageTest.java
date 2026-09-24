@@ -113,8 +113,8 @@ class RecipeLogLanguageTest {
     void skipped() throws Exception {
         givenRecipesYml("recipes:\n  e: hello\n");
         service.initRecipes();
-        assertThat(warnings()).containsExactly(
-                zh("recipe.log.skipped", "e", "expected a mapping, found the text 'hello'"));
+        assertThat(warnings()).containsExactly(zh("recipe.log.skipped", "e",
+                zh("recipe.reason.entry_expected_mapping", zh("recipe.found.text", "hello"))));
     }
 
     @Test
@@ -143,7 +143,59 @@ class RecipeLogLanguageTest {
         givenRecipesYml(recipe("big_stack", "DIAMOND", "100", THREE_ROWS_D));
         service.initRecipes();
         assertThat(warnings()).containsExactly(zh("recipe.log.invalid_output", "big_stack",
-                "output.amount: value 100 is out of range [1, 64]"));
+                zh("recipe.reason.out_of_range", "output.amount", 100, "1", "64")));
+    }
+
+    @Test
+    @DisplayName("the reason a recipe value cannot be bound is in the server's language, down to what was found")
+    void bindingReasons() throws Exception {
+        givenRecipesYml("recipes:\n  a:\n    output: DIAMOND\n"
+                + "  b:\n    output:\n      material: DIAMOND\n      amount: lots\n"
+                + "  c:\n    output:\n      material: DIAMOND\n    shape: DDD\n"
+                + "  d:\n    output:\n      material: DIAMOND\n    shape:\n      - [x]\n"
+                + "  e:\n    output:\n      material: DIAMOND\n    ingredients: D\n"
+                + "  g:\n    output:\n      material: DIAMOND\n    shape:\n      -\n"
+                + "  h:\n    output:\n      material: \"\"\n" + String.join("\n", THREE_ROWS_D) + "\n"
+                + "  i: 5\n  j: true\n  k: [1]\n");
+        service.initRecipes();
+        assertThat(warnings()).containsExactlyInAnyOrder(
+                zh("recipe.log.skipped", "a", zh("recipe.reason.expected_mapping", "output", zh("recipe.found.text", "DIAMOND"))),
+                zh("recipe.log.skipped", "b", zh("recipe.reason.expected_number", "output.amount", zh("recipe.found.text", "lots"))),
+                zh("recipe.log.skipped", "c", zh("recipe.reason.expected_list", "shape", zh("recipe.found.text", "DDD"))),
+                zh("recipe.log.skipped", "d", zh("recipe.reason.expected_text", "shape", zh("recipe.found.list"))),
+                zh("recipe.log.skipped", "e", zh("recipe.reason.expected_mapping", "ingredients", zh("recipe.found.text", "D"))),
+                zh("recipe.log.skipped", "g", zh("recipe.reason.empty_entry", "shape")),
+                zh("recipe.log.invalid_output", "h", zh("recipe.reason.must_not_be_empty", "output.material")),
+                zh("recipe.log.skipped", "i", zh("recipe.reason.entry_expected_mapping", zh("recipe.found.number"))),
+                zh("recipe.log.skipped", "j", zh("recipe.reason.entry_expected_mapping", zh("recipe.found.boolean"))),
+                zh("recipe.log.skipped", "k", zh("recipe.reason.entry_expected_mapping", zh("recipe.found.list"))));
+    }
+
+    @Test
+    @DisplayName("an empty entry and an ingredient with no value (Bukkit's YAML drops both; a map built in code does not)")
+    @SuppressWarnings("unchecked")
+    void reasonsYamlCannotProduce() {
+        Map<String, Object> ingredients = new LinkedHashMap<>();
+        ingredients.put("D", null);
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("ingredients", ingredients);
+        Map<String, Object> recipes = new LinkedHashMap<>();
+        recipes.put("f", entry);
+        recipes.put("l", null);
+        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) (Map<String, ?>) recipes);
+        service.initRecipes();
+        assertThat(warnings()).containsExactly(
+                zh("recipe.log.skipped", "f", zh("recipe.reason.no_value", "ingredients.D")),
+                zh("recipe.log.skipped", "l", zh("recipe.reason.entry_expected_mapping", zh("recipe.found.nothing"))));
+    }
+
+    @Test
+    @DisplayName("a mapping found where text belongs is named in the server's language")
+    void foundMapping() throws Exception {
+        givenRecipesYml("recipes:\n  m:\n    output:\n      material:\n        x: 1\n");
+        service.initRecipes();
+        assertThat(warnings()).containsExactly(zh("recipe.log.skipped", "m",
+                zh("recipe.reason.expected_text", "output.material", zh("recipe.found.mapping"))));
     }
 
     @Test
