@@ -107,8 +107,8 @@ table in the pull request states this explanation once.
 ## Recipe Management
 
 `RecipeCommand` — class-level `@CmdExecutor(alias = {"recipe", "ultirecipe"}, permission =
-"ultirecipe.admin", description = "Manage custom recipes")` (the source annotation's own
-`description` literal is in Chinese; translated here per this document's English-only rule),
+"ultirecipe.admin", description = "recipe.command.description")` (a catalogue key: the framework
+shows its text in the configured language, "Manage custom recipes" under `language: en`),
 `@CmdTarget(BOTH)`, gated by
 `@ConditionalOnConfig(value = "config/recipes.yml", path = "enabled")`. `RecipeService` — the
 class that actually registers, removes, and re-registers Bukkit `ShapedRecipe`s from the
