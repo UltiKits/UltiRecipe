@@ -56,8 +56,13 @@ class RecipeLogLanguageTest {
         UltiRecipeTestHelper.tearDown();
     }
 
+    /**
+     * The zh catalogue line with its arguments filled in, or a marker naming the missing key, so a
+     * failure shows the line that was actually logged next to what was expected.
+     */
     private static String zh(String key, Object... args) {
-        return String.format(CatalogueText.text("zh", key), args);
+        String text = CatalogueText.entries("zh").get(key);
+        return text == null ? "<lang/zh.json has no " + key + ">" : String.format(text, args);
     }
 
     @SuppressWarnings("unchecked")
