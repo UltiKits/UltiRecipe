@@ -998,7 +998,7 @@ class RecipeYamlLoadTest {
          *   non-@ConfigEntry    fields only)                       the framework never visits is read
          *   field                                                  by nobody
          * OutputItem          RecipeService#registerRecipe, via    @NotEmpty and @Range only
-         *                     describeConstraintViolation()
+         *                     findConstraintViolation()
          * RecipeDefinition    - (nothing reads it)                 nothing
          * </pre>
          *
