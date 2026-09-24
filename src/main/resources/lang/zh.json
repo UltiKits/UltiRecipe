@@ -26,5 +26,20 @@
   "recipe.log.ingredient_key_length": "配方材料键必须是单个字符：%s",
   "recipe.log.unknown_material": "未知材料 '%s'，配方：%s",
   "recipe.log.registered": "已注册配方：%s",
-  "recipe.log.removed": "已移除配方：%s"
+  "recipe.log.removed": "已移除配方：%s",
+  "recipe.reason.entry_expected_mapping": "应为映射，实际为%s",
+  "recipe.reason.expected_mapping": "%s：应为映射，实际为%s",
+  "recipe.reason.expected_number": "%s：应为数字，实际为%s",
+  "recipe.reason.expected_list": "%s：应为列表，实际为%s",
+  "recipe.reason.expected_text": "%s：应为文本，实际为%s",
+  "recipe.reason.empty_entry": "%s：含有空条目",
+  "recipe.reason.no_value": "%s：没有值",
+  "recipe.reason.out_of_range": "%s：值 %s 超出范围 [%s, %s]",
+  "recipe.reason.must_not_be_empty": "%s：不能为空",
+  "recipe.found.nothing": "空值",
+  "recipe.found.mapping": "映射",
+  "recipe.found.list": "列表",
+  "recipe.found.number": "数字",
+  "recipe.found.boolean": "真假值",
+  "recipe.found.text": "文本 '%s'"
 }

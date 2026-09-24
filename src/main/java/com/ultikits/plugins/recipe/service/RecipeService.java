@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.config.RecipeConfig;
+import com.ultikits.plugins.recipe.config.RecipeProblem;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
@@ -50,8 +51,26 @@ public class RecipeService {
      */
     Plugin pluginInstance;
 
+    /**
+     * The module's catalogue, for rendering a {@link RecipeProblem}: each problem looks its own text up
+     * through a literal key, so this lookup only forwards the key it is given.
+     */
+    private final RecipeProblem.Text text = new RecipeProblem.Text() {
+        @Override
+        public String i18n(String key) {
+            return plugin.i18n(key);
+        }
+    };
+
     private PluginLogger getLogger() {
         return plugin.getLogger();
+    }
+
+    /** Why a recipe value could not be bound, in the server's language. */
+    private String reason(IllegalArgumentException e) {
+        return e instanceof RecipeProblem.RecipeBindingException
+                ? ((RecipeProblem.RecipeBindingException) e).getProblem().render(text)
+                : e.getMessage();
     }
 
     /**
@@ -98,7 +117,7 @@ public class RecipeService {
             try {
                 definition = RecipeConfig.RecipeDefinition.fromConfigValue(entry.getValue());
             } catch (IllegalArgumentException e) {
-                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, e.getMessage()));
+                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, reason(e)));
                 continue;
             }
 
@@ -136,9 +155,10 @@ public class RecipeService {
         // same "Invalid output material" line a misspelled material produces, so the log could
         // not tell a blank field from a typo. A violating entry is skipped on its own, named; the
         // rest of the file still registers, and nothing is clamped.
-        String outputViolation = definition.getOutput().describeConstraintViolation();
+        RecipeProblem outputViolation = definition.getOutput().findConstraintViolation();
         if (outputViolation != null) {
-            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output"), name, outputViolation));
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output"), name,
+                    outputViolation.render(text)));
             return false;
         }
 

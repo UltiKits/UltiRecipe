@@ -38,13 +38,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sentence in every language because it was missing from both language files, and to the eleven
   console lines written while recipes are loaded, registered and removed (`Registered recipe: …`,
   `Skipped recipe '…': …`, `Invalid output for recipe: …`, `Unknown material '…' in recipe: …` and
-  the rest), which were fixed English text. Their English wording is unchanged; under
-  `language: zh` they are now Chinese. The detail after the colon in `Skipped recipe` and
-  `Invalid output for recipe`, which names the offending YAML path and value, stays English.
+  the rest), which were fixed English text, including the reason after the colon in
+  `Skipped recipe` and `Invalid output for recipe` (`expected a mapping, found …`,
+  `value 100 is out of range [1, 64]`, …). Their English wording is unchanged; under
+  `language: zh` they are now Chinese, except the YAML path and the offending value, which are
+  printed as written.
 - `language: en` 现在对 `/recipe` 命令描述生效（它在两份语言文件里都缺失，所以任何语言下都显示中文句子），
   也对加载、注册、移除配方时写出的十一条控制台日志生效（`Registered recipe: …`、`Skipped recipe '…': …`
-  等），这些日志原先写死为英文。英文措辞不变；`language: zh` 下现在是中文。`Skipped recipe` 与
-  `Invalid output for recipe` 冒号后指出 YAML 路径与取值的细节仍为英文。
+  等），这些日志原先写死为英文，包括 `Skipped recipe` 与 `Invalid output for recipe` 冒号后的原因说明。
+  英文措辞不变；`language: zh` 下现在是中文，只有 YAML 路径和出错的取值按原样打印。
 
 - A recipe's `output.material` and `output.amount` are now checked against the constraints
   declared on them (`@NotEmpty`, and `@Range(min = 1, max = 64)` inclusive at both ends). Neither
