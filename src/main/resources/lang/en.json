@@ -13,5 +13,18 @@
   "recipe.help.header": "§6=== UltiRecipe Help ===",
   "recipe.help.list": "§e/recipe list §7- List all recipes",
   "recipe.help.reload": "§e/recipe reload §7- Reload recipe config",
-  "recipe.help.count": "§e/recipe count §7- Show recipe count"
+  "recipe.help.count": "§e/recipe count §7- Show recipe count",
+
+  "recipe.command.description": "Manage custom recipes",
+  "recipe.log.none_configured": "No custom recipes configured",
+  "recipe.log.skipped": "Skipped recipe '%s': %s",
+  "recipe.log.register_failed": "Failed to register recipe: %s - %s",
+  "recipe.log.invalid_definition": "Invalid recipe definition for: %s",
+  "recipe.log.invalid_output": "Invalid output for recipe: %s - %s",
+  "recipe.log.invalid_output_material": "Invalid output material for recipe: %s",
+  "recipe.log.shape_rows": "Recipe shape must have exactly 3 rows for: %s",
+  "recipe.log.ingredient_key_length": "Ingredient key must be a single character for recipe: %s",
+  "recipe.log.unknown_material": "Unknown material '%s' in recipe: %s",
+  "recipe.log.registered": "Registered recipe: %s",
+  "recipe.log.removed": "Removed recipe: %s"
 }

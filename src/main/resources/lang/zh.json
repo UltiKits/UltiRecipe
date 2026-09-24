@@ -13,5 +13,18 @@
   "recipe.help.header": "§6=== UltiRecipe 帮助 ===",
   "recipe.help.list": "§e/recipe list §7- 列出所有配方",
   "recipe.help.reload": "§e/recipe reload §7- 重载配方配置",
-  "recipe.help.count": "§e/recipe count §7- 显示配方数量"
+  "recipe.help.count": "§e/recipe count §7- 显示配方数量",
+
+  "recipe.command.description": "管理自定义配方",
+  "recipe.log.none_configured": "未配置任何自定义配方",
+  "recipe.log.skipped": "已跳过配方 '%s'：%s",
+  "recipe.log.register_failed": "注册配方失败：%s - %s",
+  "recipe.log.invalid_definition": "配方定义无效：%s",
+  "recipe.log.invalid_output": "配方产出无效：%s - %s",
+  "recipe.log.invalid_output_material": "配方产出材料无效：%s",
+  "recipe.log.shape_rows": "配方形状必须恰好为 3 行：%s",
+  "recipe.log.ingredient_key_length": "配方材料键必须是单个字符：%s",
+  "recipe.log.unknown_material": "未知材料 '%s'，配方：%s",
+  "recipe.log.registered": "已注册配方：%s",
+  "recipe.log.removed": "已移除配方：%s"
 }

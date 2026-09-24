@@ -82,7 +82,7 @@ public class RecipeService {
         Map<String, ?> recipes = config.getRecipes();
 
         if (recipes == null || recipes.isEmpty()) {
-            getLogger().info("No custom recipes configured");
+            getLogger().info(plugin.i18n("recipe.log.none_configured"));
             return 0;
         }
 
@@ -98,7 +98,7 @@ public class RecipeService {
             try {
                 definition = RecipeConfig.RecipeDefinition.fromConfigValue(entry.getValue());
             } catch (IllegalArgumentException e) {
-                getLogger().warn("Skipped recipe '" + recipeName + "': " + e.getMessage());
+                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, e.getMessage()));
                 continue;
             }
 
@@ -107,7 +107,7 @@ public class RecipeService {
                     count++;
                 }
             } catch (Exception e) {
-                getLogger().warn("Failed to register recipe: " + recipeName + " - " + e.getMessage());
+                getLogger().warn(String.format(plugin.i18n("recipe.log.register_failed"), recipeName, e.getMessage()));
             }
         }
 
@@ -124,7 +124,7 @@ public class RecipeService {
     private boolean registerRecipe(String name, RecipeConfig.RecipeDefinition definition) {
         // Validate definition
         if (definition.getOutput() == null || definition.getShape() == null || definition.getIngredients() == null) {
-            getLogger().warn("Invalid recipe definition for: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_definition"), name));
             return false;
         }
 
@@ -138,14 +138,14 @@ public class RecipeService {
         // rest of the file still registers, and nothing is clamped.
         String outputViolation = definition.getOutput().describeConstraintViolation();
         if (outputViolation != null) {
-            getLogger().warn("Invalid output for recipe: " + name + " - " + outputViolation);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output"), name, outputViolation));
             return false;
         }
 
         // Create output item
         ItemStack output = createOutputItem(definition.getOutput());
         if (output == null) {
-            getLogger().warn("Invalid output material for recipe: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output_material"), name));
             return false;
         }
 
@@ -156,7 +156,7 @@ public class RecipeService {
         // Set shape
         List<String> shape = definition.getShape();
         if (shape.size() != 3) {
-            getLogger().warn("Recipe shape must have exactly 3 rows for: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.shape_rows"), name));
             return false;
         }
         recipe.shape(shape.get(0), shape.get(1), shape.get(2));
@@ -168,13 +168,13 @@ public class RecipeService {
             String materialName = ingredient.getValue();
             
             if (charKey.length() != 1) {
-                getLogger().warn("Ingredient key must be a single character for recipe: " + name);
+                getLogger().warn(String.format(plugin.i18n("recipe.log.ingredient_key_length"), name));
                 continue;
             }
             
             Material material = Material.matchMaterial(materialName);
             if (material == null) {
-                getLogger().warn("Unknown material '" + materialName + "' in recipe: " + name);
+                getLogger().warn(String.format(plugin.i18n("recipe.log.unknown_material"), materialName, name));
                 continue;
             }
             
@@ -185,7 +185,7 @@ public class RecipeService {
         Bukkit.addRecipe(recipe);
         registeredRecipes.add(key);
         
-        getLogger().info("Registered recipe: " + name);
+        getLogger().info(String.format(plugin.i18n("recipe.log.registered"), name));
         return true;
     }
 
@@ -240,7 +240,7 @@ public class RecipeService {
     public void removeRecipes() {
         for (NamespacedKey key : registeredRecipes) {
             Bukkit.removeRecipe(key);
-            getLogger().info("Removed recipe: " + key.getKey());
+            getLogger().info(String.format(plugin.i18n("recipe.log.removed"), key.getKey()));
         }
         registeredRecipes.clear();
     }
