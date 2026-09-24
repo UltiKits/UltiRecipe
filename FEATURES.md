@@ -73,7 +73,7 @@ find <repo-root> -path '*/src/main/java/*' -name '*.java' -not -path '*/target/*
   -not -path '*/.worktrees/*' -print0 | xargs -0 grep -nE '^[[:space:]]*@AnnotationName\b' | wc -l
 ```
 
-This module is a single-root Maven project (`src/main/java` only, 4 source files total), carries
+This module is a single-root Maven project (`src/main/java` only, 5 source files total), carries
 no git worktree directory, and has no javadoc or string-literal mention of any of its own
 annotation names — the naive (unanchored) and line-start counts are identical for every kind
 measured below, but the anchored `find`/`grep` form is used regardless, so the same command is
@@ -86,10 +86,10 @@ count alone:
 |---|---|---|
 | `@CmdExecutor` | 1 | `RecipeCommand.java:33`, class-level, `alias = {"recipe", "ultirecipe"}` |
 | `@CmdMapping` | 3 | `RecipeCommand.java:57` (`list`), `:76` (`reload`), `:85` (`count`) |
-| `@EventListener` | 0 | no event-driven behaviour exists anywhere in this module's 4 source files — confirmed by reading all 4 in full, not merely by an absent grep hit |
+| `@EventListener` | 0 | no event-driven behaviour exists anywhere in this module's 5 source files — confirmed by reading all 5 in full, not merely by an absent grep hit |
 | `@Scheduled` | 0 | same — no background task exists in this module |
 | `@ConfigEntity` | 1 | `RecipeConfig.java:47`, `@ConfigEntity("config/recipes.yml")` |
-| `@ConditionalOnConfig` | 2 | `RecipeCommand.java:38` (gates the command class) and `RecipeService.java:33` (gates the service bean) — both read the same key, `config/recipes.yml`'s `enabled`, but are two independent annotation sites gating two independent beans |
+| `@ConditionalOnConfig` | 2 | `RecipeCommand.java:38` (gates the command class) and `RecipeService.java:34` (gates the service bean) — both read the same key, `config/recipes.yml`'s `enabled`, but are two independent annotation sites gating two independent beans |
 | `@ConfigEntry` | 2 | `RecipeConfig.java:50` (`enabled`) and `:53` (`recipes`) |
 | `@Table` | 0 | no ORM entity exists in this module — recipe state lives entirely in `recipes.yml` and Bukkit's own live crafting-recipe registry, never a database row |
 
