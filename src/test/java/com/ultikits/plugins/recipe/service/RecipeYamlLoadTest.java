@@ -160,7 +160,7 @@ class RecipeYamlLoadTest {
                 // Compound values where a scalar belongs. Every one of these reaches a
                 // String.valueOf in the binder, which renders a Map or List as Java text -
                 // `{text=Blade}` - and for `name` that text became the item's display name with
-                // no warning at all. Codex P2 on #22, measured: mapping and list both registered.
+                // no warning at all. Measured: mapping and list both registered.
                 Arguments.of("output.name as a mapping",
                         "recipes:\n  e:\n    output:\n      material: DIAMOND\n      name:\n        text: Blade\n",
                         "Skipped recipe 'e': output.name: expected text, found a mapping"),

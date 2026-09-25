@@ -447,12 +447,12 @@ public class RecipeConfig extends AbstractConfigEntity {
      * Every caller of this method used to call {@code String.valueOf} directly, which renders a
      * {@code Map} or {@code List} as Java text - an indentation mistake under {@code name:}
      * became the display name {@code {text=Blade}} and the recipe registered with no warning
-     * (Codex P2 on pull request #22, measured). A compound value cannot be read as text, so it
-     * is refused here like any other structural mismatch. Scalars are unaffected, which is why
-     * {@code material: ""} and {@code material: NOT_A_MATERIAL} still bind, and are still judged
-     * afterwards rather than here: the empty one by the {@code @NotEmpty} the field declares
-     * ({@link OutputItem#findConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable
-     * one by {@code Material.matchMaterial} as before.
+     * (measured). A compound value cannot be read as text, so it is refused here like any other
+     * structural mismatch. Scalars are unaffected, which is why {@code material: ""} and {@code
+     * material: NOT_A_MATERIAL} still bind, and are still judged afterwards rather than here:
+     * the empty one by the {@code @NotEmpty} the field declares ({@link
+     * OutputItem#findConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable one by
+     * {@code Material.matchMaterial} as before.
      *
      * @param field the sub-key being bound, used in the failure message
      * @param value the parsed configuration value, never {@code null}
