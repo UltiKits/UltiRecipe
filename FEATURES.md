@@ -129,7 +129,7 @@ system, independent of whether an operator can query it through a command.
 
 ## Reload Behaviour Outside `/recipe`
 
-**Fixed by `UltiKits/UltiRecipe#11`'s wave-0 lifecycle-hook migration (this pull request).**
+**Fixed by `UltiKits/UltiRecipe#11`'s lifecycle-hook migration (this pull request).**
 Before this migration, `UltiRecipe` overrode `UltiToolsPlugin#reloadSelf()`/`#unregisterSelf()`
 directly without calling `super`, completely replacing the framework's own steps: on reload,
 `ConfigManager#reloadConfigs` and the module's `language` object refresh never ran for this module;

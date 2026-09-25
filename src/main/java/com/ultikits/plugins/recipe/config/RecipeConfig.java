@@ -107,8 +107,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * to do with that null is not made here.
          * <p>
          * Which sub-key values bind to null, and which do not. One row per case, each
-         * independently checkable against the measurement named beside it; the artefacts are in
-         * {@code revert-proofs/w1/UltiRecipe-16-scripts/}.
+         * independently checkable against the measurement named beside it (taken for
+         * UltiKits/UltiRecipe#16).
          * <pre>
          * value written in recipes.yml   binds to   the operator reads        measured by
          * ----------------------------   ---------  -----------------------   -----------------------
@@ -145,12 +145,12 @@ public class RecipeConfig extends AbstractConfigEntity {
          * output empty/no material  Failed to register recipe: &lt;name&gt; -    MUTATION-output-
          *                           Name cannot be null                     with-no-material-kept
          * </pre>
-         * That third row is the wave-1 measurement, and UltiKits/UltiRecipe#14 has since moved
-         * what it would report: with the null binding removed, an output carrying no material now
-         * meets {@code @NotEmpty} first and reports
-         * {@code Invalid output for recipe: &lt;name&gt; - output.material: must not be empty} instead
-         * of the NPE the raw {@code Material.matchMaterial(null)} call produced. The row is left
-         * as it was measured, with this note, rather than rewritten to a number nobody re-ran.
+         * That third row is the measurement taken for UltiKits/UltiRecipe#16, and
+         * UltiKits/UltiRecipe#14 has since moved what it would report: with the null binding removed,
+         * an output carrying no material now meets {@code @NotEmpty} first and reports {@code Invalid
+         * output for recipe: &lt;name&gt; - output.material: must not be empty} instead of the NPE
+         * the raw {@code Material.matchMaterial(null)} call produced. The row is left as it was
+         * measured, with this note, rather than rewritten to a number nobody re-ran.
          * <p>
          * Why the {@code ingredients} row of that second table says what it says. Measured
          * against Paper 1.21.11 itself, bootstrapped:
