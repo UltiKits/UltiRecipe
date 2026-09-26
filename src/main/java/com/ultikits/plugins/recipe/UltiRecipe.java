@@ -29,10 +29,10 @@ public class UltiRecipe extends UltiToolsPlugin {
         RecipeService recipeService = getContext().getBean(RecipeService.class);
         if (recipeService != null) {
             int count = recipeService.initRecipes();
-            getLogger().info(String.format(i18n("已注册 %d 个自定义配方"), count));
+            getLogger().info(String.format(i18n("recipe.log.registered_count"), count));
         }
 
-        getLogger().info(i18n("UltiRecipe 已启用！"));
+        getLogger().info(i18n("recipe.log.enabled"));
         return true;
     }
 
@@ -44,7 +44,7 @@ public class UltiRecipe extends UltiToolsPlugin {
             recipeService.removeRecipes();
         }
 
-        getLogger().info(i18n("UltiRecipe 已禁用！"));
+        getLogger().info(i18n("recipe.log.disabled"));
     }
 
     @Override
@@ -53,7 +53,7 @@ public class UltiRecipe extends UltiToolsPlugin {
         RecipeService recipeService = getContext().getBean(RecipeService.class);
         if (recipeService != null) {
             int count = recipeService.reloadRecipes();
-            getLogger().info(String.format(i18n("配方已重载，共 %d 个配方"), count));
+            getLogger().info(String.format(i18n("recipe.log.reloaded_count"), count));
         }
     }
 }

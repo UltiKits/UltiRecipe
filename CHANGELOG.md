@@ -7,6 +7,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Language keys were renamed from Chinese sentences to ASCII keys (for example `recipe.help.header`).
+  An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
+  the new keys; until then the renamed messages show the new built-in text. A server whose language
+  files were never edited needs no action.
+- 语言键已从中文句子改为 ASCII 键（例如 `recipe.help.header`）。改过本模块 `lang/en.json` 或
+  `lang/zh.json` 的运维需要把改动重新套到新键上；在此之前，这些消息显示新的内置文本。从未改过语言文件的服务器无需任何操作。
+
 ### Removed
 
 - `RecipeConfig#initDefaults()`, which claimed in its own javadoc to be "called by the framework
@@ -24,6 +33,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   否决，只是延后：由 UltiKits/UltiRecipe#23 跟踪**（UltiKits/UltiRecipe#13）。
 
 ### Fixed
+
+- `language: en` now applies to the `/recipe` command description, which showed the Chinese
+  sentence in every language because it was missing from both language files, and to the eleven
+  console lines written while recipes are loaded, registered and removed (`Registered recipe: …`,
+  `Skipped recipe '…': …`, `Invalid output for recipe: …`, `Unknown material '…' in recipe: …` and
+  the rest), which were fixed English text, including the reason after the colon in
+  `Skipped recipe` and `Invalid output for recipe` (`expected a mapping, found …`,
+  `value 100 is out of range [1, 64]`, …). Their English wording is unchanged; under
+  `language: zh` they are now Chinese, except the YAML path and the offending value, which are
+  printed as written.
+- `language: en` 现在对 `/recipe` 命令描述生效（它在两份语言文件里都缺失，所以任何语言下都显示中文句子），
+  也对加载、注册、移除配方时写出的十一条控制台日志生效（`Registered recipe: …`、`Skipped recipe '…': …`
+  等），这些日志原先写死为英文，包括 `Skipped recipe` 与 `Invalid output for recipe` 冒号后的原因说明。
+  英文措辞不变；`language: zh` 下现在是中文，只有 YAML 路径和出错的取值按原样打印。
 
 - A recipe's `output.material` and `output.amount` are now checked against the constraints
   declared on them (`@NotEmpty`, and `@Range(min = 1, max = 64)` inclusive at both ends). Neither
