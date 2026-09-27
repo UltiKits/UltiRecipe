@@ -1,5 +1,7 @@
 package com.ultikits.plugins.recipe;
 
+import com.ultikits.plugins.recipe.i18n.CatalogueText;
+
 import com.ultikits.plugins.recipe.service.RecipeService;
 import com.ultikits.ultitools.context.SimpleContainer;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
@@ -28,7 +30,7 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(service);
             when(service.initRecipes()).thenReturn(5);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             when(plugin.registerSelf()).thenCallRealMethod();
 
             boolean result = plugin.registerSelf();
@@ -50,7 +52,7 @@ class UltiRecipeTest {
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(service);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             doCallRealMethod().when(plugin).onUnregister();
 
             plugin.onUnregister();
@@ -69,7 +71,7 @@ class UltiRecipeTest {
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(null);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             doCallRealMethod().when(plugin).onUnregister();
 
             // Should not throw exception
@@ -90,7 +92,7 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(service);
             when(service.reloadRecipes()).thenReturn(8);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             doCallRealMethod().when(plugin).onReload();
 
             plugin.onReload();
@@ -110,7 +112,7 @@ class UltiRecipeTest {
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(null);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             doCallRealMethod().when(plugin).onReload();
 
             // Should not throw exception
@@ -136,7 +138,7 @@ class UltiRecipeTest {
             when(plugin.getContext()).thenReturn(context);
             when(context.getBean(RecipeService.class)).thenReturn(service);
             when(service.initRecipes()).thenReturn(0);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             when(plugin.registerSelf()).thenCallRealMethod();
 
             boolean result = plugin.registerSelf();
@@ -153,7 +155,7 @@ class UltiRecipeTest {
 
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.getContext()).thenReturn(null);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
             when(plugin.registerSelf()).thenCallRealMethod();
 
             // Should throw NPE when trying to get bean from null context

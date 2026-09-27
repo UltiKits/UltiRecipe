@@ -160,7 +160,7 @@ class RecipeYamlLoadTest {
                 // Compound values where a scalar belongs. Every one of these reaches a
                 // String.valueOf in the binder, which renders a Map or List as Java text -
                 // `{text=Blade}` - and for `name` that text became the item's display name with
-                // no warning at all. Codex P2 on #22, measured: mapping and list both registered.
+                // no warning at all. Measured: mapping and list both registered.
                 Arguments.of("output.name as a mapping",
                         "recipes:\n  e:\n    output:\n      material: DIAMOND\n      name:\n        text: Blade\n",
                         "Skipped recipe 'e': output.name: expected text, found a mapping"),
@@ -437,8 +437,7 @@ class RecipeYamlLoadTest {
 
         /**
          * The two instruments disagree for this fixture, so each is stated with its own
-         * observation. One row per instrument; artefacts in
-         * `revert-proofs/w1/UltiRecipe-16-scripts/`.
+         * observation. One row per instrument (measured for UltiKits/UltiRecipe#16).
          *
          * <pre>
          * instrument         before the fix, entry with no `ingredients`       measured by
@@ -691,16 +690,16 @@ class RecipeYamlLoadTest {
         }
     }
 
-    // --- a defect this change does not fix, pinned so wave 2 can see the contract ---------
+    // --- a defect this change does not fix, pinned so a later fix can see the contract ----
 
     /**
      * `RecipeService#registerRecipe`'s ingredient loop uses `continue` for both of its failure
      * branches - a key that is not one character, and a material that does not resolve - and then
      * registers the recipe regardless of how many ingredients were actually set. Filed as
      * UltiKits/UltiRecipe#21; NOT fixed here, because that loop is recipe validation and belongs
-     * to wave 2 with #13/#14.
+     * with #13/#14.
      *
-     * <p>Pinned rather than left unrecorded because wave 2 touches exactly this method, and
+     * <p>Pinned rather than left unrecorded because the fix for #13/#14 touches exactly this method, and
      * without a test nothing in the tree says that "warn, skip the ingredient, register anyway" is
      * the contract today.
      *
@@ -998,7 +997,7 @@ class RecipeYamlLoadTest {
          *   non-@ConfigEntry    fields only)                       the framework never visits is read
          *   field                                                  by nobody
          * OutputItem          RecipeService#registerRecipe, via    @NotEmpty and @Range only
-         *                     describeConstraintViolation()
+         *                     findConstraintViolation()
          * RecipeDefinition    - (nothing reads it)                 nothing
          * </pre>
          *
@@ -1010,21 +1009,21 @@ class RecipeYamlLoadTest {
          * three-row shape check with {@code @Size(min = 3, max = 3)} on
          * {@code RecipeDefinition.shape}, would ship a fresh silent no-op with the suite green.
          * Widening the walk to {@code RecipeConfig} and every class it declares removes the class
-         * of defect rather than the one instance of it (gate 1, WR-04).
+         * of defect rather than the one instance of it.
          *
          * <p>A constraint being read is necessary and not sufficient, so the walk makes a second
-         * assertion (gate 1 IN-02). {@code @Range} is gated on {@code value instanceof Number} by
-         * this module's reader and by the framework's own {@code isRangeViolation} alike, so
-         * {@code @Range(min = 1, max = 3)} on {@code lore} - a plausible confusion with
-         * {@code @Size}, which is the annotation that actually takes a length - is read, skipped,
-         * and enforces nothing. The first assertion cannot see that, because {@code @Range} on
-         * {@code OutputItem} is by construction "read". The two assertions together are what makes
-         * the guard cover the defect rather than one of its spellings.
+         * assertion. {@code @Range} is gated on {@code value instanceof Number} by this module's
+         * reader and by the framework's own {@code isRangeViolation} alike, so {@code @Range(min
+         * = 1, max = 3)} on {@code lore} - a plausible confusion with {@code @Size}, which is the
+         * annotation that actually takes a length - is read, skipped, and enforces nothing. The
+         * first assertion cannot see that, because {@code @Range} on {@code OutputItem} is by
+         * construction "read". The two assertions together are what makes the guard cover the
+         * defect rather than one of its spellings.
          *
          * <p>It is green both before and after the fix: it guards the fix's scope, it does not
-         * prove it. That each assertion can actually fail is recorded separately, as
-         * {@code revert-proofs/w2/UltiRecipe-14-MUTATION-recipedefinition-size-RED.log} and
-         * {@code …-MUTATION-range-on-lore-RED.log}.
+         * prove it. That each assertion can actually fail was shown separately, by mutating the
+         * config (an {@code @Size} on {@code RecipeDefinition}, an {@code @Range} on {@code
+         * lore}) and watching it go red.
          */
         @Test
         @DisplayName("every constraint declared in this config's object graph is read by something")
@@ -1099,7 +1098,7 @@ class RecipeYamlLoadTest {
 
             assertThat(declared)
                     .as("if either nested class stops being reached, the guard above silently "
-                            + "narrows back to what WR-04 found")
+                            + "narrows back to the single-class walk its first revision made")
                     .contains(RecipeConfig.OutputItem.class, RecipeConfig.RecipeDefinition.class);
         }
     }

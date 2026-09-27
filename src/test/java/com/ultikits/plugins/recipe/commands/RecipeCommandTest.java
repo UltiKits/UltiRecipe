@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe.commands;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
+import com.ultikits.plugins.recipe.i18n.CatalogueText;
 import com.ultikits.plugins.recipe.service.RecipeService;
 
 import org.bukkit.command.Command;
@@ -26,6 +27,8 @@ class RecipeCommandTest {
     @BeforeEach
     void setUp() throws Exception {
         UltiRecipeTestHelper.setUp();
+        // These assertions quote the Chinese text: answer from the real zh catalogue.
+        when(UltiRecipeTestHelper.getMockPlugin().i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
 
         service = mock(RecipeService.class);
         command = new RecipeCommand();

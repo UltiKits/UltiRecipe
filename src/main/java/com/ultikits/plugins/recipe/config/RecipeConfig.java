@@ -107,8 +107,8 @@ public class RecipeConfig extends AbstractConfigEntity {
          * to do with that null is not made here.
          * <p>
          * Which sub-key values bind to null, and which do not. One row per case, each
-         * independently checkable against the measurement named beside it; the artefacts are in
-         * {@code revert-proofs/w1/UltiRecipe-16-scripts/}.
+         * independently checkable against the measurement named beside it (taken for
+         * UltiKits/UltiRecipe#16).
          * <pre>
          * value written in recipes.yml   binds to   the operator reads        measured by
          * ----------------------------   ---------  -----------------------   -----------------------
@@ -129,7 +129,7 @@ public class RecipeConfig extends AbstractConfigEntity {
          * of its own that names the offending sub-key. The two used to share the second message,
          * which meant a blank field and a typo read identically in the log; the empty shape moved
          * onto the {@code @NotEmpty} the field declares when UltiKits/UltiRecipe#14 made that
-         * annotation actually run (see {@link OutputItem#describeConstraintViolation()}). The
+         * annotation actually run (see {@link OutputItem#findConstraintViolation()}). The
          * unusable shape did not move, and its test is the control that says so.
          * <p>
          * What each folded case would report without the null binding. One row per case, each
@@ -145,12 +145,12 @@ public class RecipeConfig extends AbstractConfigEntity {
          * output empty/no material  Failed to register recipe: &lt;name&gt; -    MUTATION-output-
          *                           Name cannot be null                     with-no-material-kept
          * </pre>
-         * That third row is the wave-1 measurement, and UltiKits/UltiRecipe#14 has since moved
-         * what it would report: with the null binding removed, an output carrying no material now
-         * meets {@code @NotEmpty} first and reports
-         * {@code Invalid output for recipe: &lt;name&gt; - output.material: must not be empty} instead
-         * of the NPE the raw {@code Material.matchMaterial(null)} call produced. The row is left
-         * as it was measured, with this note, rather than rewritten to a number nobody re-ran.
+         * That third row is the measurement taken for UltiKits/UltiRecipe#16, and
+         * UltiKits/UltiRecipe#14 has since moved what it would report: with the null binding removed,
+         * an output carrying no material now meets {@code @NotEmpty} first and reports {@code Invalid
+         * output for recipe: &lt;name&gt; - output.material: must not be empty} instead of the NPE
+         * the raw {@code Material.matchMaterial(null)} call produced. The row is left as it was
+         * measured, with this note, rather than rewritten to a number nobody re-ran.
          * <p>
          * Why the {@code ingredients} row of that second table says what it says. Measured
          * against Paper 1.21.11 itself, bootstrapped:
@@ -217,8 +217,8 @@ public class RecipeConfig extends AbstractConfigEntity {
                 return (RecipeDefinition) value;
             }
             if (!(value instanceof Map)) {
-                throw new IllegalArgumentException(
-                        "expected a mapping, found " + describeType(value));
+                throw RecipeProblem.of(RecipeProblem.Kind.ENTRY_EXPECTED_MAPPING, RecipeProblem.found(value))
+                        .toException();
             }
             Map<?, ?> map = (Map<?, ?>) value;
             RecipeDefinition definition = new RecipeDefinition();
@@ -280,8 +280,8 @@ public class RecipeConfig extends AbstractConfigEntity {
                 return (OutputItem) value;
             }
             if (!(value instanceof Map)) {
-                throw new IllegalArgumentException(
-                        "output: expected a mapping, found " + describeType(value));
+                throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_MAPPING, "output", RecipeProblem.found(value))
+                        .toException();
             }
             Map<?, ?> map = (Map<?, ?>) value;
             OutputItem item = new OutputItem();
@@ -299,8 +299,8 @@ public class RecipeConfig extends AbstractConfigEntity {
             Object amount = map.get("amount");
             if (amount != null) {
                 if (!(amount instanceof Number)) {
-                    throw new IllegalArgumentException(
-                            "output.amount: expected a number, found " + describeType(amount));
+                    throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_NUMBER, "output.amount",
+                            RecipeProblem.found(amount)).toException();
                 }
                 item.setAmount(((Number) amount).intValue());
             }
@@ -343,13 +343,13 @@ public class RecipeConfig extends AbstractConfigEntity {
          * registers. Nothing is clamped - an operator who wrote {@code amount: 100} gets told so,
          * rather than quietly receiving 64.
          *
-         * @return the violation, worded as the operator's own {@code output.<sub-key>} path, or
+         * @return the violation, naming the operator's own {@code output.<sub-key>} path, or
          *         {@code null} if every declared constraint is satisfied
          */
         @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
         // Reads this class's own private fields reflectively, which is the point: naming them
         // one by one is what lets a later field be added with a constraint that nothing reads.
-        public String describeConstraintViolation() {
+        public RecipeProblem findConstraintViolation() {
             for (Field field : OutputItem.class.getDeclaredFields()) {
                 if (field.isSynthetic() || Modifier.isStatic(field.getModifiers())) {
                     continue;
@@ -366,13 +366,13 @@ public class RecipeConfig extends AbstractConfigEntity {
                 if (range != null && value instanceof Number) {
                     double number = ((Number) value).doubleValue();
                     if (number < range.min() || number > range.max()) {
-                        return "output." + field.getName() + ": value " + value + " is out of range ["
-                                + describeBound(range.min()) + ", " + describeBound(range.max()) + "]";
+                        return RecipeProblem.of(RecipeProblem.Kind.OUT_OF_RANGE, "output." + field.getName(), value,
+                                describeBound(range.min()), describeBound(range.max()));
                     }
                 }
                 if (field.getAnnotation(NotEmpty.class) != null
                         && (value == null || value.toString().trim().isEmpty())) {
-                    return "output." + field.getName() + ": must not be empty";
+                    return RecipeProblem.of(RecipeProblem.Kind.MUST_NOT_BE_EMPTY, "output." + field.getName());
                 }
             }
             return null;
@@ -406,13 +406,12 @@ public class RecipeConfig extends AbstractConfigEntity {
      */
     private static List<String> toStringList(String field, Object value) {
         if (!(value instanceof List)) {
-            throw new IllegalArgumentException(
-                    field + ": expected a list, found " + describeType(value));
+            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_LIST, field, RecipeProblem.found(value)).toException();
         }
         List<String> result = new ArrayList<>();
         for (Object element : (List<?>) value) {
             if (element == null) {
-                throw new IllegalArgumentException(field + ": contains an empty entry");
+                throw RecipeProblem.of(RecipeProblem.Kind.EMPTY_ENTRY, field).toException();
             }
             result.add(asText(field, element));
         }
@@ -429,14 +428,12 @@ public class RecipeConfig extends AbstractConfigEntity {
      */
     private static Map<String, String> toStringMap(String field, Object value) {
         if (!(value instanceof Map)) {
-            throw new IllegalArgumentException(
-                    field + ": expected a mapping, found " + describeType(value));
+            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_MAPPING, field, RecipeProblem.found(value)).toException();
         }
         Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
             if (entry.getValue() == null) {
-                throw new IllegalArgumentException(
-                        field + "." + entry.getKey() + ": has no value");
+                throw RecipeProblem.of(RecipeProblem.Kind.NO_VALUE, field + "." + entry.getKey()).toException();
             }
             result.put(String.valueOf(entry.getKey()),
                        asText(field + "." + entry.getKey(), entry.getValue()));
@@ -450,12 +447,12 @@ public class RecipeConfig extends AbstractConfigEntity {
      * Every caller of this method used to call {@code String.valueOf} directly, which renders a
      * {@code Map} or {@code List} as Java text - an indentation mistake under {@code name:}
      * became the display name {@code {text=Blade}} and the recipe registered with no warning
-     * (Codex P2 on pull request #22, measured). A compound value cannot be read as text, so it
-     * is refused here like any other structural mismatch. Scalars are unaffected, which is why
-     * {@code material: ""} and {@code material: NOT_A_MATERIAL} still bind, and are still judged
-     * afterwards rather than here: the empty one by the {@code @NotEmpty} the field declares
-     * ({@link OutputItem#describeConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable
-     * one by {@code Material.matchMaterial} as before.
+     * (measured). A compound value cannot be read as text, so it is refused here like any other
+     * structural mismatch. Scalars are unaffected, which is why {@code material: ""} and {@code
+     * material: NOT_A_MATERIAL} still bind, and are still judged afterwards rather than here:
+     * the empty one by the {@code @NotEmpty} the field declares ({@link
+     * OutputItem#findConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable one by
+     * {@code Material.matchMaterial} as before.
      *
      * @param field the sub-key being bound, used in the failure message
      * @param value the parsed configuration value, never {@code null}
@@ -464,35 +461,8 @@ public class RecipeConfig extends AbstractConfigEntity {
      */
     private static String asText(String field, Object value) {
         if (value instanceof Map || value instanceof List) {
-            throw new IllegalArgumentException(
-                    field + ": expected text, found " + describeType(value));
+            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_TEXT, field, RecipeProblem.found(value)).toException();
         }
         return String.valueOf(value);
-    }
-
-    /**
-     * Names what was found where a different shape was expected, for a binding failure
-     * message an operator can act on.
-     *
-     * @param value the offending value
-     * @return a short description of the value's kind
-     */
-    private static String describeType(Object value) {
-        if (value == null) {
-            return "nothing";
-        }
-        if (value instanceof Map) {
-            return "a mapping";
-        }
-        if (value instanceof List) {
-            return "a list";
-        }
-        if (value instanceof Number) {
-            return "a number";
-        }
-        if (value instanceof Boolean) {
-            return "a true/false value";
-        }
-        return "the text '" + value + "'";
     }
 }

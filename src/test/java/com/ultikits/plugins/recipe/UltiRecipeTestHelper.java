@@ -1,5 +1,7 @@
 package com.ultikits.plugins.recipe;
 
+import com.ultikits.plugins.recipe.i18n.CatalogueText;
+
 import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
@@ -77,9 +79,9 @@ public final class UltiRecipeTestHelper {
         mockLogger = mock(PluginLogger.class);
         lenient().when(mockPlugin.getLogger()).thenReturn(mockLogger);
 
-        // Mock i18n to return the key as-is
+        // i18n answers from the real shipped English catalogue, as a server on `language: en` does
         lenient().when(mockPlugin.i18n(anyString()))
-                .thenAnswer(inv -> inv.getArgument(0));
+                .thenAnswer(CatalogueText.answer("en"));
 
         // Mock getDataOperator
         lenient().when(mockPlugin.getDataOperator(any()))

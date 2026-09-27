@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.config.RecipeConfig;
+import com.ultikits.plugins.recipe.config.RecipeProblem;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
@@ -50,8 +51,26 @@ public class RecipeService {
      */
     Plugin pluginInstance;
 
+    /**
+     * The module's catalogue, for rendering a {@link RecipeProblem}: each problem looks its own text up
+     * through a literal key, so this lookup only forwards the key it is given.
+     */
+    private final RecipeProblem.Text text = new RecipeProblem.Text() {
+        @Override
+        public String i18n(String key) {
+            return plugin.i18n(key);
+        }
+    };
+
     private PluginLogger getLogger() {
         return plugin.getLogger();
+    }
+
+    /** Why a recipe value could not be bound, in the server's language. */
+    private String reason(IllegalArgumentException e) {
+        return e instanceof RecipeProblem.RecipeBindingException
+                ? ((RecipeProblem.RecipeBindingException) e).getProblem().render(text)
+                : e.getMessage();
     }
 
     /**
@@ -82,7 +101,7 @@ public class RecipeService {
         Map<String, ?> recipes = config.getRecipes();
 
         if (recipes == null || recipes.isEmpty()) {
-            getLogger().info("No custom recipes configured");
+            getLogger().info(plugin.i18n("recipe.log.none_configured"));
             return 0;
         }
 
@@ -98,7 +117,7 @@ public class RecipeService {
             try {
                 definition = RecipeConfig.RecipeDefinition.fromConfigValue(entry.getValue());
             } catch (IllegalArgumentException e) {
-                getLogger().warn("Skipped recipe '" + recipeName + "': " + e.getMessage());
+                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, reason(e)));
                 continue;
             }
 
@@ -107,7 +126,7 @@ public class RecipeService {
                     count++;
                 }
             } catch (Exception e) {
-                getLogger().warn("Failed to register recipe: " + recipeName + " - " + e.getMessage());
+                getLogger().warn(String.format(plugin.i18n("recipe.log.register_failed"), recipeName, e.getMessage()));
             }
         }
 
@@ -124,7 +143,7 @@ public class RecipeService {
     private boolean registerRecipe(String name, RecipeConfig.RecipeDefinition definition) {
         // Validate definition
         if (definition.getOutput() == null || definition.getShape() == null || definition.getIngredients() == null) {
-            getLogger().warn("Invalid recipe definition for: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_definition"), name));
             return false;
         }
 
@@ -136,16 +155,17 @@ public class RecipeService {
         // same "Invalid output material" line a misspelled material produces, so the log could
         // not tell a blank field from a typo. A violating entry is skipped on its own, named; the
         // rest of the file still registers, and nothing is clamped.
-        String outputViolation = definition.getOutput().describeConstraintViolation();
+        RecipeProblem outputViolation = definition.getOutput().findConstraintViolation();
         if (outputViolation != null) {
-            getLogger().warn("Invalid output for recipe: " + name + " - " + outputViolation);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output"), name,
+                    outputViolation.render(text)));
             return false;
         }
 
         // Create output item
         ItemStack output = createOutputItem(definition.getOutput());
         if (output == null) {
-            getLogger().warn("Invalid output material for recipe: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output_material"), name));
             return false;
         }
 
@@ -156,7 +176,7 @@ public class RecipeService {
         // Set shape
         List<String> shape = definition.getShape();
         if (shape.size() != 3) {
-            getLogger().warn("Recipe shape must have exactly 3 rows for: " + name);
+            getLogger().warn(String.format(plugin.i18n("recipe.log.shape_rows"), name));
             return false;
         }
         recipe.shape(shape.get(0), shape.get(1), shape.get(2));
@@ -168,13 +188,13 @@ public class RecipeService {
             String materialName = ingredient.getValue();
             
             if (charKey.length() != 1) {
-                getLogger().warn("Ingredient key must be a single character for recipe: " + name);
+                getLogger().warn(String.format(plugin.i18n("recipe.log.ingredient_key_length"), name));
                 continue;
             }
             
             Material material = Material.matchMaterial(materialName);
             if (material == null) {
-                getLogger().warn("Unknown material '" + materialName + "' in recipe: " + name);
+                getLogger().warn(String.format(plugin.i18n("recipe.log.unknown_material"), materialName, name));
                 continue;
             }
             
@@ -185,7 +205,7 @@ public class RecipeService {
         Bukkit.addRecipe(recipe);
         registeredRecipes.add(key);
         
-        getLogger().info("Registered recipe: " + name);
+        getLogger().info(String.format(plugin.i18n("recipe.log.registered"), name));
         return true;
     }
 
@@ -240,7 +260,7 @@ public class RecipeService {
     public void removeRecipes() {
         for (NamespacedKey key : registeredRecipes) {
             Bukkit.removeRecipe(key);
-            getLogger().info("Removed recipe: " + key.getKey());
+            getLogger().info(String.format(plugin.i18n("recipe.log.removed"), key.getKey()));
         }
         registeredRecipes.clear();
     }
