@@ -1199,4 +1199,65 @@ class RecipeYamlLoadTest {
             assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
         }
     }
+
+    // --- UltiKits/UltiRecipe#24 ------------------------------------------------------------
+
+    @Nested
+    @DisplayName("a fractional output.amount is refused, quoting it as written (UltiKits/UltiRecipe#24)")
+    class FractionalAmountRefused {
+
+        private String entry(String name, String amount) {
+            return "  " + name + ":\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "      amount: " + amount + "\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n";
+        }
+
+        @Test
+        @DisplayName("2.5 is refused with 2.5 in the warning, and a good neighbour still registers")
+        void twoPointFiveIsRefused() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("frac", "2.5") + GOOD_ENTRY);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'frac': output.amount: expected a whole number, found 2.5");
+        }
+
+        @Test
+        @DisplayName("0.5 is refused naming 0.5, not the 0 it used to be truncated to")
+        void zeroPointFiveNamesWhatWasWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("half", "0.5"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'half': output.amount: expected a whole number, found 0.5");
+        }
+
+        @Test
+        @DisplayName("a whole number written with a decimal point (2.0) is still a stack of 2")
+        void twoPointZeroIsTwo() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("two", "2.0"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(registered("two").getResult().getAmount()).isEqualTo(2);
+            assertThat(warnings()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a whole number too large for a stack size is out of range as written, not wrapped")
+        void hugeNumberIsOutOfRangeAsWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("huge", "3000000000"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'huge': output.amount: value 3000000000 is out of range [1, 64]");
+        }
+    }
 }
