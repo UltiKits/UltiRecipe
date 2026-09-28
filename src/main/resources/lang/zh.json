@@ -31,6 +31,7 @@
   "recipe.reason.entry_expected_mapping": "应为映射，实际为%s",
   "recipe.reason.expected_mapping": "%s：应为映射，实际为%s",
   "recipe.reason.expected_number": "%s：应为数字，实际为%s",
+  "recipe.reason.not_whole_number": "%s：应为整数，实际为%s",
   "recipe.reason.expected_list": "%s：应为列表，实际为%s",
   "recipe.reason.expected_text": "%s：应为文本，实际为%s",
   "recipe.reason.empty_entry": "%s：含有空条目",

@@ -34,6 +34,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
+  warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,
+  found 2.5`. It used to be truncated without a word, so `2.5` registered a stack of 2, and `0.5` was
+  reported as `value 0`, a number nobody wrote. `2.0` still means 2 (UltiKits/UltiRecipe#24).
+- `config/recipes.yml` 中带小数的 `output.amount`（例如 `2.5`）现在会让该配方被拒绝，警告按原样引用所写的值：
+  `Skipped recipe '<名称>': output.amount: expected a whole number, found 2.5`。此前它会被静默截断，`2.5` 注册为 2 个，
+  `0.5` 则被报告为谁也没写过的 `value 0`。`2.0` 仍表示 2（UltiKits/UltiRecipe#24）。
+
 - A recipe in `config/recipes.yml` with an ingredient the module cannot use — an unknown material, or
   an ingredient key longer than one character — is no longer registered. Each such ingredient is named
   as written in a console warning, for example

@@ -28,7 +28,7 @@ public final class RecipeProblem {
 
     /** Every reason, and every description of a found value, that binding a recipe can report. */
     enum Kind {
-        ENTRY_EXPECTED_MAPPING, EXPECTED_MAPPING, EXPECTED_NUMBER, EXPECTED_LIST, EXPECTED_TEXT,
+        ENTRY_EXPECTED_MAPPING, EXPECTED_MAPPING, EXPECTED_NUMBER, NOT_WHOLE_NUMBER, EXPECTED_LIST, EXPECTED_TEXT,
         EMPTY_ENTRY, NO_VALUE, OUT_OF_RANGE, MUST_NOT_BE_EMPTY,
         FOUND_NOTHING, FOUND_MAPPING, FOUND_LIST, FOUND_NUMBER, FOUND_BOOLEAN, FOUND_TEXT
     }
@@ -92,6 +92,8 @@ public final class RecipeProblem {
                 return text.i18n("recipe.reason.expected_mapping");
             case EXPECTED_NUMBER:
                 return text.i18n("recipe.reason.expected_number");
+            case NOT_WHOLE_NUMBER:
+                return text.i18n("recipe.reason.not_whole_number");
             case EXPECTED_LIST:
                 return text.i18n("recipe.reason.expected_list");
             case EXPECTED_TEXT:
