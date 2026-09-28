@@ -34,6 +34,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A recipe in `config/recipes.yml` with an ingredient the module cannot use — an unknown material, or
+  an ingredient key longer than one character — is no longer registered. Each such ingredient is named
+  as written in a console warning, for example
+  `Recipe 'partial' not registered: ingredient 'S' names an unknown material 'NOT_A_MATERIAL'`.
+  The ingredient used to be skipped and the rest of the recipe registered, which the server turned into
+  a different recipe that could be crafted with fewer materials, or into an unexplained index error
+  (UltiKits/UltiRecipe#21). The warnings for an unknown output material and for a shape without three
+  rows now also quote the value as written.
+- `config/recipes.yml` 中含有模块无法使用的材料（未知材料，或多于一个字符的材料键）的配方不再注册，控制台警告会按原样点名
+  每一个这样的材料，例如 `Recipe 'partial' not registered: ingredient 'S' names an unknown material 'NOT_A_MATERIAL'`。
+  此前会跳过该材料并注册配方的其余部分，服务器会把它变成一个用更少材料就能合成的另一张配方，或者报出无从解释的索引错误
+  （UltiKits/UltiRecipe#21）。未知产出材料和形状不是三行的警告现在也会按原样引用所写的值。
+
 - `/recipe reload` now reads `config/recipes.yml` again before it re-registers the recipes, so an
   edit made while the server is running takes effect without a restart. It used to re-register the
   recipes held in memory since start-up. If the file cannot be read, the recipes loaded before are
