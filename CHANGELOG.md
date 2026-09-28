@@ -34,6 +34,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `/recipe reload` now reads `config/recipes.yml` again before it re-registers the recipes, so an
+  edit made while the server is running takes effect without a restart. It used to re-register the
+  recipes held in memory since start-up. If the file cannot be read, the recipes loaded before are
+  registered again and a console warning names the error (UltiKits/UltiRecipe#12).
+- `/recipe reload` 现在会先重新读取 `config/recipes.yml` 再重新注册配方，服务器运行中修改文件后无需重启即可生效。
+  此前它只会重新注册启动时加载到内存中的配方。若文件无法读取，会重新注册之前已加载的配方，并在控制台警告中写明
+  错误（UltiKits/UltiRecipe#12）。
+
 - `language: en` now applies to the `/recipe` command description, which showed the Chinese
   sentence in every language because it was missing from both language files, and to the eleven
   console lines written while recipes are loaded, registered and removed (`Registered recipe: …`,

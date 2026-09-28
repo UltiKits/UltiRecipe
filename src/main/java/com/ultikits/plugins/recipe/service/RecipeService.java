@@ -16,6 +16,7 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -266,11 +267,22 @@ public class RecipeService {
     }
 
     /**
-     * Reloads all recipes (removes and re-registers).
+     * Reloads all recipes: reads {@code config/recipes.yml} again, then removes the registered
+     * recipes and registers the file's recipes.
+     * <p>
+     * {@code /recipe reload} calls this directly, outside the framework's own reload, so without the
+     * read here it re-registered the recipes held in memory since start-up and an edit to the file
+     * never took effect (UltiKits/UltiRecipe#12). The file is read before anything is removed: if it
+     * cannot be read, the recipes loaded before are registered again and the error is logged.
      *
      * @return the number of recipes registered after reload
      */
     public int reloadRecipes() {
+        try {
+            config.reload();
+        } catch (IOException e) {
+            getLogger().warn(String.format(plugin.i18n("recipe.log.config_reload_failed"), e.getMessage()));
+        }
         removeRecipes();
         return initRecipes();
     }

@@ -27,6 +27,7 @@
   "recipe.log.unknown_material": "未知材料 '%s'，配方：%s",
   "recipe.log.registered": "已注册配方：%s",
   "recipe.log.removed": "已移除配方：%s",
+  "recipe.log.config_reload_failed": "无法重新读取 config/recipes.yml，因此重新注册之前已加载的配方：%s",
   "recipe.reason.entry_expected_mapping": "应为映射，实际为%s",
   "recipe.reason.expected_mapping": "%s：应为映射，实际为%s",
   "recipe.reason.expected_number": "%s：应为数字，实际为%s",

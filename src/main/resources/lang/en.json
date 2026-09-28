@@ -27,6 +27,7 @@
   "recipe.log.unknown_material": "Unknown material '%s' in recipe: %s",
   "recipe.log.registered": "Registered recipe: %s",
   "recipe.log.removed": "Removed recipe: %s",
+  "recipe.log.config_reload_failed": "Could not read config/recipes.yml again, so the recipes loaded before are registered again: %s",
   "recipe.reason.entry_expected_mapping": "expected a mapping, found %s",
   "recipe.reason.expected_mapping": "%s: expected a mapping, found %s",
   "recipe.reason.expected_number": "%s: expected a number, found %s",
