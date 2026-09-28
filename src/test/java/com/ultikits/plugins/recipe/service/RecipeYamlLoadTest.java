@@ -297,7 +297,8 @@ class RecipeYamlLoadTest {
 
             assertThat(service.initRecipes()).isZero();
             assertThat(service.getRecipeList()).isEmpty();
-            assertThat(warnings()).containsExactly("Recipe shape must have exactly 3 rows for: two_rows");
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'two_rows' not registered: the shape must have exactly 3 rows, found [DD, DD]");
         }
 
         @Test
@@ -641,7 +642,8 @@ class RecipeYamlLoadTest {
             assertThat(service.initRecipes()).isZero();
             assertThat(service.getRecipeList()).isEmpty();
             verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
-            assertThat(warnings()).containsExactly("Invalid output material for recipe: bad_material");
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'bad_material' not registered: unknown output material 'NOT_A_MATERIAL'");
         }
 
         @Test
