@@ -1139,7 +1139,8 @@ class RecipeYamlLoadTest {
             int count = service.reloadRecipes();
 
             assertThat(count).isEqualTo(1);
-            assertThat(service.getRecipeList()).containsExactly("Custom_Sword");
+            // the registry key is lower-cased, as every NamespacedKey is
+            assertThat(service.getRecipeList()).containsExactly("custom_sword");
             assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
         }
     }
