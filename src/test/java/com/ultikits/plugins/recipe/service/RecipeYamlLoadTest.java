@@ -1102,4 +1102,45 @@ class RecipeYamlLoadTest {
                     .contains(RecipeConfig.OutputItem.class, RecipeConfig.RecipeDefinition.class);
         }
     }
+
+    // --- UltiKits/UltiRecipe#12 ------------------------------------------------------------
+
+    @Nested
+    @DisplayName("/recipe reload reads config/recipes.yml again (UltiKits/UltiRecipe#12)")
+    class ReloadReadsTheFile {
+
+        @Test
+        @DisplayName("an edit made after start-up is what the reload registers")
+        void editedFileIsRegistered() throws Exception {
+            givenRecipesYml(LEGAL_SWORD);
+            assertThat(service.initRecipes()).isEqualTo(1);
+            // The operator edits the file: the next read of it yields only the 'good' recipe
+            org.mockito.Mockito.doAnswer(invocation -> {
+                givenRecipesYml("recipes:\n" + GOOD_ENTRY);
+                return null;
+            }).when(config).reload();
+
+            int count = service.reloadRecipes();
+
+            assertThat(count).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(registered("good").getResult().getType()).isEqualTo(Material.DIAMOND_SWORD);
+            assertThat(Bukkit.getRecipe(new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(),
+                    "ultirecipe_Custom_Sword"))).as("the recipe the edit removed").isNull();
+        }
+
+        @Test
+        @DisplayName("a file that cannot be read again keeps the recipes loaded before, and says so")
+        void unreadableFileKeepsWhatWasLoaded() throws Exception {
+            givenRecipesYml(LEGAL_SWORD);
+            service.initRecipes();
+            org.mockito.Mockito.doThrow(new java.io.IOException("disk gone")).when(config).reload();
+
+            int count = service.reloadRecipes();
+
+            assertThat(count).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("Custom_Sword");
+            assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
+        }
+    }
 }
