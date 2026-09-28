@@ -9,6 +9,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `/recipe` deliberately takes over the vanilla `/recipe` command of the same name, as the maintainer
+  decided; this is now stated in the documentation. The vanilla command stays reachable as
+  `minecraft:recipe` (UltiKits/UltiRecipe#27).
+- `/recipe` 按维护者决定有意接管同名的原版 `/recipe` 命令，现已写入文档；原版命令仍可用 `minecraft:recipe` 调用
+  （UltiKits/UltiRecipe#27）。
+
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `recipe.help.header`).
   An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
   the new keys; until then the renamed messages show the new built-in text. A server whose language
