@@ -297,7 +297,8 @@ class RecipeYamlLoadTest {
 
             assertThat(service.initRecipes()).isZero();
             assertThat(service.getRecipeList()).isEmpty();
-            assertThat(warnings()).containsExactly("Recipe shape must have exactly 3 rows for: two_rows");
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'two_rows' not registered: the shape must have exactly 3 rows, found [DD, DD]");
         }
 
         @Test
@@ -641,7 +642,8 @@ class RecipeYamlLoadTest {
             assertThat(service.initRecipes()).isZero();
             assertThat(service.getRecipeList()).isEmpty();
             verify(UltiRecipeTestHelper.getMockLogger(), never()).info(startsWith("Registered recipe"));
-            assertThat(warnings()).containsExactly("Invalid output material for recipe: bad_material");
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'bad_material' not registered: unknown output material 'NOT_A_MATERIAL'");
         }
 
         @Test
@@ -727,18 +729,17 @@ class RecipeYamlLoadTest {
      * #21 with the same measurement.
      */
     @Nested
-    @DisplayName("known defect UltiKits/UltiRecipe#21 - an unusable ingredient still registers")
-    class UnusableIngredientStillRegisters {
+    @DisplayName("an entry with an unusable ingredient is refused, naming the ingredient as written (UltiKits/UltiRecipe#21)")
+    class UnusableIngredientRefused {
 
         /**
-         * This fixture is the FIRST row of the table on this class: `S` is unusable but `D` is
-         * defined, so part of the shape survives the substitution. On Paper 1.21.11 it registers
-         * as `D D` x3 at width 3, height 3. The registration asserted below is MockBukkit's
-         * store-and-return, which is the same verdict here for a different reason.
+         * The FIRST row of the table on this class: `S` is unusable but `D` is defined. Registering
+         * it anyway made Paper 1.21.11 register `D D` x3, a craftable recipe the operator never
+         * wrote. It is now refused before anything reaches the server.
          */
         @Test
-        @DisplayName("an unknown ingredient material is warned about, skipped, and the recipe registers without it")
-        void unknownIngredientMaterialStillRegisters() throws Exception {
+        @DisplayName("an unknown ingredient material: not registered, the key and the material named; a good neighbour still registers")
+        void unknownIngredientMaterialIsRefused() throws Exception {
             givenRecipesYml(
                     "recipes:\n"
                     + "  partial:\n"
@@ -750,36 +751,26 @@ class RecipeYamlLoadTest {
                     + "      - \"DSD\"\n"
                     + "    ingredients:\n"
                     + "      D: DIAMOND\n"
-                    + "      S: NOT_A_MATERIAL\n");
+                    + "      S: NOT_A_MATERIAL\n"
+                    + GOOD_ENTRY);
 
             assertThat(service.initRecipes()).isEqualTo(1);
-            assertThat(warnings())
-                    .containsExactly("Unknown material 'NOT_A_MATERIAL' in recipe: partial");
-            // The warning and the success line are about the same recipe. That pairing is the
-            // defect, so assert both halves - a future fix has to change one of them.
-            verify(UltiRecipeTestHelper.getMockLogger()).info("Registered recipe: partial");
-            assertThat(service.getRecipeList()).containsExactly("partial");
-
-            ShapedRecipe recipe = registered("partial");
-            assertThat(recipe.getShape()).containsExactly("DSD", "DSD", "DSD");
-            assertThat(recipe.getIngredientMap().get('D')).isNotNull();
-            assertThat(recipe.getIngredientMap().get('S')).isNull();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'partial' not registered: ingredient 'S' names an unknown material 'NOT_A_MATERIAL'");
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info("Registered recipe: partial");
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(Bukkit.getRecipe(new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(),
+                    "ultirecipe_partial"))).isNull();
         }
 
         /**
-         * The loop's other failure branch, and the last of `RecipeService`'s seven refusal
-         * messages to have had no test reaching it through the framework's own bind path. Same
-         * defect, same issue: the key is rejected, no ingredient is set at all, and on this
-         * harness the recipe registers regardless.
-         *
-         * <p>This fixture is the second row of the table on this class: nothing in the shape is
-         * defined, so on Paper 1.21.11 `ShapedRecipePattern.of` throws and the entry does not
-         * register there. The registration asserted below is what MockBukkit's store-and-return
-         * `addRecipe` produces.
+         * The second row: nothing in the shape is defined. On Paper 1.21.11 this threw from
+         * `ShapedRecipePattern.of` and was reported as an opaque index error; it is now refused
+         * with the key as written.
          */
         @Test
-        @DisplayName("a multi-character ingredient key is warned about, skipped, and the recipe registers with no ingredients at all")
-        void multiCharacterIngredientKeyStillRegisters() throws Exception {
+        @DisplayName("a multi-character ingredient key: not registered, the key named as written")
+        void multiCharacterIngredientKeyIsRefused() throws Exception {
             givenRecipesYml(
                     "recipes:\n"
                     + "  wide_key:\n"
@@ -792,16 +783,80 @@ class RecipeYamlLoadTest {
                     + "    ingredients:\n"
                     + "      DD: DIAMOND\n");
 
-            assertThat(service.initRecipes()).isEqualTo(1);
-            assertThat(warnings())
-                    .containsExactly("Ingredient key must be a single character for recipe: wide_key");
-            verify(UltiRecipeTestHelper.getMockLogger()).info("Registered recipe: wide_key");
-            assertThat(service.getRecipeList()).containsExactly("wide_key");
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'wide_key' not registered: ingredient key 'DD' is not a single character");
+            assertThat(service.getRecipeList()).isEmpty();
+        }
 
-            ShapedRecipe recipe = registered("wide_key");
-            assertThat(recipe.getShape()).containsExactly("DDD", "DDD", "DDD");
-            // Nothing was set: the shape's only character has no ingredient behind it.
-            assertThat(recipe.getIngredientMap().get('D')).isNull();
+        @Test
+        @DisplayName("every unusable ingredient of one entry is named, and the entry is refused once")
+        void everyUnusableIngredientIsNamed() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  odd:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n"
+                    + "      xx: COAL\n"
+                    + "      Q: NOPE_NOT_REAL\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactlyInAnyOrder(
+                    "Recipe 'odd' not registered: ingredient key 'xx' is not a single character",
+                    "Recipe 'odd' not registered: ingredient 'Q' names an unknown material 'NOPE_NOT_REAL'");
+            assertThat(service.getRecipeList()).isEmpty();
+        }
+    }
+
+    // --- operator values the module cannot use: the output material and the shape -----------
+
+    @Nested
+    @DisplayName("an unusable output material or shape is refused, quoting the value as written")
+    class UnusableOutputOrShapeNamed {
+
+        @Test
+        @DisplayName("an unknown output material is named")
+        void unknownOutputMaterialNamed() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  no_such:\n"
+                    + "    output:\n"
+                    + "      material: DIAMUND\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'no_such' not registered: unknown output material 'DIAMUND'");
+        }
+
+        @Test
+        @DisplayName("a shape without three rows is quoted")
+        void shapeRowsQuoted() throws Exception {
+            givenRecipesYml(
+                    "recipes:\n"
+                    + "  two_rows:\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"DD\"\n"
+                    + "      - \"DD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n");
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'two_rows' not registered: the shape must have exactly 3 rows, found [DD, DD]");
         }
     }
 
@@ -1100,6 +1155,109 @@ class RecipeYamlLoadTest {
                     .as("if either nested class stops being reached, the guard above silently "
                             + "narrows back to the single-class walk its first revision made")
                     .contains(RecipeConfig.OutputItem.class, RecipeConfig.RecipeDefinition.class);
+        }
+    }
+
+    // --- UltiKits/UltiRecipe#12 ------------------------------------------------------------
+
+    @Nested
+    @DisplayName("/recipe reload reads config/recipes.yml again (UltiKits/UltiRecipe#12)")
+    class ReloadReadsTheFile {
+
+        @Test
+        @DisplayName("an edit made after start-up is what the reload registers")
+        void editedFileIsRegistered() throws Exception {
+            givenRecipesYml(LEGAL_SWORD);
+            assertThat(service.initRecipes()).isEqualTo(1);
+            // The operator edits the file: the next read of it yields only the 'good' recipe
+            org.mockito.Mockito.doAnswer(invocation -> {
+                givenRecipesYml("recipes:\n" + GOOD_ENTRY);
+                return null;
+            }).when(config).reload();
+
+            int count = service.reloadRecipes();
+
+            assertThat(count).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(registered("good").getResult().getType()).isEqualTo(Material.DIAMOND_SWORD);
+            assertThat(Bukkit.getRecipe(new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(),
+                    "ultirecipe_Custom_Sword"))).as("the recipe the edit removed").isNull();
+        }
+
+        @Test
+        @DisplayName("a file that cannot be read again keeps the recipes loaded before, and says so")
+        void unreadableFileKeepsWhatWasLoaded() throws Exception {
+            givenRecipesYml(LEGAL_SWORD);
+            service.initRecipes();
+            org.mockito.Mockito.doThrow(new java.io.IOException("disk gone")).when(config).reload();
+
+            int count = service.reloadRecipes();
+
+            assertThat(count).isEqualTo(1);
+            // the registry key is lower-cased, as every NamespacedKey is
+            assertThat(service.getRecipeList()).containsExactly("custom_sword");
+            assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
+        }
+    }
+
+    // --- UltiKits/UltiRecipe#24 ------------------------------------------------------------
+
+    @Nested
+    @DisplayName("a fractional output.amount is refused, quoting it as written (UltiKits/UltiRecipe#24)")
+    class FractionalAmountRefused {
+
+        private String entry(String name, String amount) {
+            return "  " + name + ":\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "      amount: " + amount + "\n"
+                    + "    shape:\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "      - \"DDD\"\n"
+                    + "    ingredients:\n"
+                    + "      D: DIAMOND\n";
+        }
+
+        @Test
+        @DisplayName("2.5 is refused with 2.5 in the warning, and a good neighbour still registers")
+        void twoPointFiveIsRefused() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("frac", "2.5") + GOOD_ENTRY);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'frac': output.amount: expected a whole number, found 2.5");
+        }
+
+        @Test
+        @DisplayName("0.5 is refused naming 0.5, not the 0 it used to be truncated to")
+        void zeroPointFiveNamesWhatWasWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("half", "0.5"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'half': output.amount: expected a whole number, found 0.5");
+        }
+
+        @Test
+        @DisplayName("a whole number written with a decimal point (2.0) is still a stack of 2")
+        void twoPointZeroIsTwo() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("two", "2.0"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(registered("two").getResult().getAmount()).isEqualTo(2);
+            assertThat(warnings()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a whole number too large for a stack size is out of range as written, not wrapped")
+        void hugeNumberIsOutOfRangeAsWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("huge", "3000000000"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Skipped recipe 'huge': output.amount: value 3000000000 is out of range [1, 64]");
         }
     }
 }

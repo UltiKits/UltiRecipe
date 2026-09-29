@@ -44,6 +44,13 @@
 | `/recipe reload` | `ultirecipe.admin` | 重载配方配置 |
 | `/recipe count` | `ultirecipe.admin` | 显示已注册的配方数量 |
 
+> `/recipe` deliberately takes over the vanilla `/recipe` command of the same name (the maintainer's
+> decision); the vanilla command that grants and takes recipes stays reachable as `minecraft:recipe`.
+> `/ultirecipe` is the same command as `/recipe`.
+>
+> `/recipe` 有意接管同名的原版 `/recipe` 命令（维护者的决定）；用于授予和收回配方的原版命令仍可通过 `minecraft:recipe` 调用。
+> `/ultirecipe` 与 `/recipe` 是同一个命令。
+
 ## ⚙️ 配置
 
 ### 配置文件结构

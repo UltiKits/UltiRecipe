@@ -203,7 +203,7 @@ class RecipeLogLanguageTest {
     void invalidOutputMaterial() throws Exception {
         givenRecipesYml(recipe("no_such", "NOT_A_MATERIAL", null, THREE_ROWS_D));
         service.initRecipes();
-        assertThat(warnings()).containsExactly(zh("recipe.log.invalid_output_material", "no_such"));
+        assertThat(warnings()).containsExactly(zh("recipe.log.refused_output_material", "no_such", "NOT_A_MATERIAL"));
     }
 
     @Test
@@ -212,7 +212,7 @@ class RecipeLogLanguageTest {
         givenRecipesYml(recipe("two_rows", "DIAMOND", null, "    shape:", "      - \"DD\"", "      - \"DD\"",
                 "    ingredients:", "      D: DIAMOND"));
         service.initRecipes();
-        assertThat(warnings()).containsExactly(zh("recipe.log.shape_rows", "two_rows"));
+        assertThat(warnings()).containsExactly(zh("recipe.log.refused_shape_rows", "two_rows", "[DD, DD]"));
     }
 
     @Test
@@ -222,8 +222,8 @@ class RecipeLogLanguageTest {
                 "      - \"DDD\"", "    ingredients:", "      D: DIAMOND", "      xx: COAL", "      Q: NOPE_NOT_REAL"));
         service.initRecipes();
         assertThat(warnings()).containsExactlyInAnyOrder(
-                zh("recipe.log.ingredient_key_length", "odd"),
-                zh("recipe.log.unknown_material", "NOPE_NOT_REAL", "odd"));
+                zh("recipe.log.refused_ingredient_key", "odd", "xx"),
+                zh("recipe.log.refused_ingredient_material", "odd", "Q", "NOPE_NOT_REAL"));
     }
 
     @Test

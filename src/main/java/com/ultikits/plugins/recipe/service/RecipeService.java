@@ -16,6 +16,7 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -165,7 +166,8 @@ public class RecipeService {
         // Create output item
         ItemStack output = createOutputItem(definition.getOutput());
         if (output == null) {
-            getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_output_material"), name));
+            getLogger().warn(String.format(plugin.i18n("recipe.log.refused_output_material"), name,
+                    definition.getOutput().getMaterial()));
             return false;
         }
 
@@ -176,29 +178,45 @@ public class RecipeService {
         // Set shape
         List<String> shape = definition.getShape();
         if (shape.size() != 3) {
-            getLogger().warn(String.format(plugin.i18n("recipe.log.shape_rows"), name));
+            getLogger().warn(String.format(plugin.i18n("recipe.log.refused_shape_rows"), name, shape));
             return false;
         }
         recipe.shape(shape.get(0), shape.get(1), shape.get(2));
 
-        // Set ingredients
+        // Resolve every ingredient before anything is registered. An ingredient the module cannot use
+        // refuses the whole entry, naming the ingredient as written: skipping it and registering the
+        // rest made the server register a different, craftable recipe the operator never wrote, or
+        // fail with an opaque index error when nothing was left (UltiKits/UltiRecipe#21, maintainer
+        // decision 2026-09-27). Every unusable ingredient is named, so one pass over the file finds
+        // them all.
         Map<String, String> ingredients = definition.getIngredients();
+        Map<Character, Material> resolved = new LinkedHashMap<>();
+        boolean usable = true;
         for (Map.Entry<String, String> ingredient : ingredients.entrySet()) {
             String charKey = ingredient.getKey();
             String materialName = ingredient.getValue();
-            
+
             if (charKey.length() != 1) {
-                getLogger().warn(String.format(plugin.i18n("recipe.log.ingredient_key_length"), name));
+                getLogger().warn(String.format(plugin.i18n("recipe.log.refused_ingredient_key"), name, charKey));
+                usable = false;
                 continue;
             }
-            
+
             Material material = Material.matchMaterial(materialName);
             if (material == null) {
-                getLogger().warn(String.format(plugin.i18n("recipe.log.unknown_material"), materialName, name));
+                getLogger().warn(String.format(plugin.i18n("recipe.log.refused_ingredient_material"),
+                        name, charKey, materialName));
+                usable = false;
                 continue;
             }
-            
-            recipe.setIngredient(charKey.charAt(0), material);
+
+            resolved.put(charKey.charAt(0), material);
+        }
+        if (!usable) {
+            return false;
+        }
+        for (Map.Entry<Character, Material> ingredient : resolved.entrySet()) {
+            recipe.setIngredient(ingredient.getKey(), ingredient.getValue());
         }
 
         // Register recipe
@@ -266,11 +284,22 @@ public class RecipeService {
     }
 
     /**
-     * Reloads all recipes (removes and re-registers).
+     * Reloads all recipes: reads {@code config/recipes.yml} again, then removes the registered
+     * recipes and registers the file's recipes.
+     * <p>
+     * {@code /recipe reload} calls this directly, outside the framework's own reload, so without the
+     * read here it re-registered the recipes held in memory since start-up and an edit to the file
+     * never took effect (UltiKits/UltiRecipe#12). The file is read before anything is removed: if it
+     * cannot be read, the recipes loaded before are registered again and the error is logged.
      *
      * @return the number of recipes registered after reload
      */
     public int reloadRecipes() {
+        try {
+            config.reload();
+        } catch (IOException e) {
+            getLogger().warn(String.format(plugin.i18n("recipe.log.config_reload_failed"), e.getMessage()));
+        }
         removeRecipes();
         return initRecipes();
     }

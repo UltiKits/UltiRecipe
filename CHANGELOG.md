@@ -9,6 +9,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `/recipe` deliberately takes over the vanilla `/recipe` command of the same name, as the maintainer
+  decided; this is now stated in the documentation. The vanilla command stays reachable as
+  `minecraft:recipe` (UltiKits/UltiRecipe#27).
+- `/recipe` 按维护者决定有意接管同名的原版 `/recipe` 命令，现已写入文档；原版命令仍可用 `minecraft:recipe` 调用
+  （UltiKits/UltiRecipe#27）。
+
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `recipe.help.header`).
   An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
   the new keys; until then the renamed messages show the new built-in text. A server whose language
@@ -33,6 +39,35 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   否决，只是延后：由 UltiKits/UltiRecipe#23 跟踪**（UltiKits/UltiRecipe#13）。
 
 ### Fixed
+
+- A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
+  warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,
+  found 2.5`. It used to be truncated without a word, so `2.5` registered a stack of 2, and `0.5` was
+  reported as `value 0`, a number nobody wrote. `2.0` still means 2 (UltiKits/UltiRecipe#24).
+- `config/recipes.yml` 中带小数的 `output.amount`（例如 `2.5`）现在会让该配方被拒绝，警告按原样引用所写的值：
+  `Skipped recipe '<名称>': output.amount: expected a whole number, found 2.5`。此前它会被静默截断，`2.5` 注册为 2 个，
+  `0.5` 则被报告为谁也没写过的 `value 0`。`2.0` 仍表示 2（UltiKits/UltiRecipe#24）。
+
+- A recipe in `config/recipes.yml` with an ingredient the module cannot use — an unknown material, or
+  an ingredient key longer than one character — is no longer registered. Each such ingredient is named
+  as written in a console warning, for example
+  `Recipe 'partial' not registered: ingredient 'S' names an unknown material 'NOT_A_MATERIAL'`.
+  The ingredient used to be skipped and the rest of the recipe registered, which the server turned into
+  a different recipe that could be crafted with fewer materials, or into an unexplained index error
+  (UltiKits/UltiRecipe#21). The warnings for an unknown output material and for a shape without three
+  rows now also quote the value as written.
+- `config/recipes.yml` 中含有模块无法使用的材料（未知材料，或多于一个字符的材料键）的配方不再注册，控制台警告会按原样点名
+  每一个这样的材料，例如 `Recipe 'partial' not registered: ingredient 'S' names an unknown material 'NOT_A_MATERIAL'`。
+  此前会跳过该材料并注册配方的其余部分，服务器会把它变成一个用更少材料就能合成的另一张配方，或者报出无从解释的索引错误
+  （UltiKits/UltiRecipe#21）。未知产出材料和形状不是三行的警告现在也会按原样引用所写的值。
+
+- `/recipe reload` now reads `config/recipes.yml` again before it re-registers the recipes, so an
+  edit made while the server is running takes effect without a restart. It used to re-register the
+  recipes held in memory since start-up. If the file cannot be read, the recipes loaded before are
+  registered again and a console warning names the error (UltiKits/UltiRecipe#12).
+- `/recipe reload` 现在会先重新读取 `config/recipes.yml` 再重新注册配方，服务器运行中修改文件后无需重启即可生效。
+  此前它只会重新注册启动时加载到内存中的配方。若文件无法读取，会重新注册之前已加载的配方，并在控制台警告中写明
+  错误（UltiKits/UltiRecipe#12）。
 
 - `language: en` now applies to the `/recipe` command description, which showed the Chinese
   sentence in every language because it was missing from both language files, and to the eleven

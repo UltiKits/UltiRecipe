@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe.config;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -292,17 +293,17 @@ public class RecipeConfig extends AbstractConfigEntity {
             // Deliberate asymmetry, recorded so the next reader does not take one half for the
             // house style: material and name accept any SCALAR (asText refuses a mapping or a
             // list), because a material name is text and Material.matchMaterial judges it;
-            // amount refuses a non-number outright, because silently coercing a stack size is
-            // how an operator ends up with a quantity they did not write. Two consequences
-            // follow, both accepted: amount: "1" quoted as text skips the whole entry, and
-            // amount: 2.5 is truncated to 2 by intValue() without a warning.
+            // amount refuses anything but a whole number, because silently coercing a stack size
+            // is how an operator ends up with a quantity they did not write: amount: "1" quoted as
+            // text skips the whole entry, and so does amount: 2.5, named as written rather than
+            // truncated to 2 (UltiKits/UltiRecipe#24, maintainer decision 2026-09-27).
             Object amount = map.get("amount");
             if (amount != null) {
                 if (!(amount instanceof Number)) {
                     throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_NUMBER, "output.amount",
                             RecipeProblem.found(amount)).toException();
                 }
-                item.setAmount(((Number) amount).intValue());
+                item.setAmount(wholeAmount((Number) amount));
             }
             Object name = map.get("name");
             if (name != null) {
@@ -313,6 +314,40 @@ public class RecipeConfig extends AbstractConfigEntity {
                 item.setLore(toStringList("output.lore", lore));
             }
             return item;
+        }
+
+        /**
+         * The whole number {@code amount} as written, for {@code output.amount}.
+         * <p>
+         * {@code intValue()} used to truncate {@code 2.5} to 2 and {@code 0.5} to 0 without a word,
+         * and wrapped a whole number too large for an {@code int}. A value with a fractional part is
+         * refused, quoting the value as written; {@code 2.0} is the whole number 2; a whole number
+         * outside the {@code int} range is refused as out of the field's declared range, again as
+         * written, since no stack size can hold it (UltiKits/UltiRecipe#24).
+         */
+        private static int wholeAmount(Number amount) {
+            BigDecimal exact;
+            try {
+                exact = new BigDecimal(amount.toString());
+            } catch (NumberFormatException e) {
+                // Infinity and NaN have no decimal form, and are no stack size
+                throw RecipeProblem.of(RecipeProblem.Kind.NOT_WHOLE_NUMBER, "output.amount", amount).toException();
+            }
+            if (exact.signum() != 0 && exact.stripTrailingZeros().scale() > 0) {
+                throw RecipeProblem.of(RecipeProblem.Kind.NOT_WHOLE_NUMBER, "output.amount", amount).toException();
+            }
+            if (exact.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0
+                    || exact.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
+                Range range;
+                try {
+                    range = OutputItem.class.getDeclaredField("amount").getAnnotation(Range.class);
+                } catch (NoSuchFieldException e) {
+                    throw new IllegalStateException("OutputItem has no amount field", e);
+                }
+                throw RecipeProblem.of(RecipeProblem.Kind.OUT_OF_RANGE, "output.amount", amount,
+                        describeBound(range.min()), describeBound(range.max())).toException();
+            }
+            return exact.intValueExact();
         }
 
         /**

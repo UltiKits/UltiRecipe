@@ -209,7 +209,7 @@ class RecipeServiceTest {
                 int count = service.initRecipes();
 
                 assertThat(count).isZero();
-                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("Invalid output material"));
+                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("unknown output material 'INVALID_MATERIAL'"));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -479,7 +479,7 @@ class RecipeServiceTest {
 
                 service.initRecipes();
 
-                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("single character"));
+                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("ingredient key 'xx' is not a single character"));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -521,7 +521,7 @@ class RecipeServiceTest {
 
                 service.initRecipes();
 
-                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("Unknown material"));
+                verify(UltiRecipeTestHelper.getMockLogger()).warn(contains("names an unknown material 'UNKNOWN_MATERIAL'"));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
