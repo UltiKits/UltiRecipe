@@ -68,15 +68,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   写入英文注释（此前所有语言下都是中文）。已有文件中这两项的注释会在下次启动时切换为服务器语言；配置值不变，你手写在这两项上方的
   注释会被替换（UltiKits/UltiRecipe#31）。
 
-- When `/ul reload UltiRecipe` cannot read `config/recipes.yml` again, the module now records it in the
-  framework's reload report, so the reply says the reload was partial and names the file and the error
-  instead of a plain success; the recipes loaded before stay registered, as before (UltiKits/UltiRecipe#30).
-  An invalid or unreadable file counts: UltiTools-API 6.3.0 reports it to the module by throwing
-  `ConfigurationException` from the re-read and leaving the configuration as it was
-  (UltiKits/UltiTools-Reborn#589), and the module records that exactly like a read error.
-- `/ul reload UltiRecipe` 无法重新读取 `config/recipes.yml` 时，本模块现在会把它记进框架的重载报告，回复会说明这次重载只完成了一部分，
-  并写明文件和错误，而不是一律回复成功；之前加载的配方仍然有效（UltiKits/UltiRecipe#30）。YAML 写错或文件不可读也算在内：
-  UltiTools-API 6.3.0 会在重新读取时抛出 `ConfigurationException` 并保持配置不变（UltiKits/UltiTools-Reborn#589），本模块把它当作读取错误同样记录。
+- `/ul reload UltiRecipe` no longer replies a plain success when `config/recipes.yml` cannot be read again.
+  An invalid or unreadable file is caught by the framework's own configuration reload, which runs before
+  this module's reload code (UltiKits/UltiTools-Reborn#589): the reply is `Module UltiRecipe failed to
+  reload: <cause>`, the cause naming `config/recipes.yml`, the console shows the framework's SEVERE line,
+  and the recipes loaded before stay registered. If a later re-read by the module itself fails, the module
+  records it in the framework's reload report, so the reply says the reload was partial and names the file
+  and the error (UltiKits/UltiRecipe#30).
+- 重新读取 `config/recipes.yml` 失败时，`/ul reload UltiRecipe` 不再一律回复成功。YAML 写错或文件不可读会在框架自己的配置重载中被发现，
+  它在本模块的重载代码之前执行（UltiKits/UltiTools-Reborn#589）：回复为 `Module UltiRecipe failed to reload: <原因>`，原因写明
+  `config/recipes.yml`，控制台显示框架的 SEVERE 行，之前加载的配方仍然有效。若之后本模块自己的再次读取失败，本模块会把它记进框架的
+  重载报告，回复会说明这次重载只完成了一部分，并写明文件和错误（UltiKits/UltiRecipe#30）。
 
 - `/recipe reload` no longer replies `Recipes reloaded!` when `config/recipes.yml` could not be read again
   (an unreadable file, invalid YAML): it replies `Recipes reloaded only in part, <n> recipes total: <reason>`,
