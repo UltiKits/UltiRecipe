@@ -40,6 +40,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- UltiRecipe loads on UltiTools-API 6.3.0. That framework refuses at module load a configuration value
+  type it cannot store, and refused this module with `no config converter for
+  ...RecipeConfig$RecipeDefinition` (file `config/recipes.yml`, key `recipes`); the module now registers a
+  converter for its recipes. An existing `recipes.yml` loads with the same values and is not rewritten,
+  and a recipe that cannot be read is skipped with the same warning as before. Two values Bukkit's parser
+  used to drop without a word are now named: a recipe written with no value at all (`hollow:`) is skipped
+  with `Skipped recipe 'hollow': expected a mapping, found nothing`, and an ingredient written with no
+  material (`D:`) skips its recipe with `Skipped recipe '<name>': ingredients.D: has no value` (it used to
+  disappear, which refused the recipe as an invalid definition or, beside other ingredients, left its
+  shape letter empty). This version must be released together with UltiTools-API 6.3.0
+  (UltiKits/UltiRecipe#32).
+- UltiRecipe 可在 UltiTools-API 6.3.0 上加载。该框架在模块加载时拒绝它无法存储的配置值类型，此前会以
+  `no config converter for ...RecipeConfig$RecipeDefinition`（文件 `config/recipes.yml`，键 `recipes`）拒绝本模块；
+  现在本模块为配方注册了转换器。已有的 `recipes.yml` 读出的值不变，文件也不会被改写；读不成配方的条目仍以原来的警告跳过。
+  Bukkit 解析器以前会悄悄丢掉的两种写法现在会被点名：完全没有值的配方（`hollow:`）以
+  `Skipped recipe 'hollow': expected a mapping, found nothing` 跳过；没有写材料的配料（`D:`）以
+  `Skipped recipe '<名称>': ingredients.D: has no value` 跳过该配方（此前它会消失，配方要么被当成无效定义拒绝，要么在有其他配料时
+  让那个形状字母变成空格）。本版本必须与 UltiTools-API 6.3.0 一同发布（UltiKits/UltiRecipe#32）。
+
 - A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
   warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,
   found 2.5`. It used to be truncated without a word, so `2.5` registered a stack of 2, and `0.5` was

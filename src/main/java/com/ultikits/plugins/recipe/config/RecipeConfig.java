@@ -1,13 +1,12 @@
 package com.ultikits.plugins.recipe.config;
 
 import java.lang.reflect.Field;
-import java.math.BigDecimal;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.ultikits.ultitools.abstracts.AbstractConfigEntity;
 import com.ultikits.ultitools.annotations.ConfigEntity;
@@ -15,6 +14,7 @@ import com.ultikits.ultitools.annotations.ConfigEntry;
 import com.ultikits.ultitools.annotations.config.NotEmpty;
 import com.ultikits.ultitools.annotations.config.Range;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -60,6 +60,19 @@ public class RecipeConfig extends AbstractConfigEntity {
 
     /**
      * Recipe definition for a single custom recipe.
+     * <p>
+     * Bound from and written to {@code recipes.<name>} by {@link RecipeDefinitionConverter}, which the
+     * framework discovers in this module's scan packages (UltiKits/UltiRecipe#32). The converter keeps
+     * every part as written: an absent part is {@code null}, an empty list or mapping stays empty, and an
+     * {@code output} block with no {@code material} is an {@link OutputItem} whose material is
+     * {@code null}. Whether the result is a usable recipe is judged in one place,
+     * {@code RecipeService#registerRecipe}, which refuses an absent or empty part with
+     * {@code Invalid recipe definition for: <name>}. A value that cannot be read as a recipe at all is an
+     * {@link UnreadableRecipe}.
+     * <p>
+     * Equality is by value, as the framework's round-trip contract requires: two definitions are equal
+     * when their output, shape and ingredients are equal, and a definition is never equal to an
+     * {@link UnreadableRecipe}.
      */
     @Getter
     @Setter
@@ -81,161 +94,68 @@ public class RecipeConfig extends AbstractConfigEntity {
          */
         private Map<String, String> ingredients = new HashMap<>();
 
-        /**
-         * Binds one parsed {@code recipes.<name>} value onto a {@code RecipeDefinition}.
-         * <p>
-         * The framework binds the {@code recipes} key through
-         * {@code DefaultConfigParser#parse}, which turns every nested YAML mapping into a
-         * {@code LinkedHashMap} and never into the declared value type. The declared
-         * {@code Map<String, RecipeDefinition>} field therefore holds maps at runtime, and
-         * reading a value back as a {@code RecipeDefinition} throws {@code ClassCastException}
-         * (UltiKits/UltiRecipe#16). This method binds the value explicitly.
-         * <p>
-         * Only the structure is bound here. Whether the resulting recipe is usable - the
-         * output material resolves, the shape has the row count the service requires, an
-         * ingredient key is one character - stays where it already lives, in
-         * {@code RecipeService#registerRecipe}.
-         * <p>
-         * All three of {@code output}, {@code shape} and {@code ingredients} bind to
-         * {@code null} when the operator did not supply them, or supplied them with nothing
-         * usable under them. The field's own non-null default is not used for those cases, so
-         * that {@code RecipeService#registerRecipe}'s existing
-         * {@code output == null || shape == null || ingredients == null} guard still sees them.
-         * "Nothing usable" means an empty mapping or list, and for {@code output} it means a
-         * block carrying no {@code material}. Note that Bukkit DROPS a mapping key whose value
-         * is empty, so {@code ingredients:} with only {@code D:} under it arrives here as an
-         * empty mapping; "empty" and "absent" therefore bind alike. The decision about what
-         * to do with that null is not made here.
-         * <p>
-         * Which sub-key values bind to null, and which do not. One row per case, each
-         * independently checkable against the measurement named beside it (taken for
-         * UltiKits/UltiRecipe#16).
-         * <pre>
-         * value written in recipes.yml   binds to   the operator reads        measured by
-         * ----------------------------   ---------  -----------------------   -----------------------
-         * ingredients: absent or empty   null       Invalid recipe            RecipeYamlLoadTest
-         * shape:       absent or empty   null       definition for: &lt;name&gt;    $RequiredKeyAbsent
-         * output:      absent, {}, or               (all three cases)         (each case has its
-         *              no material       null                                  own test there)
-         *
-         * material: ""                   itself     Invalid output for        emptyMaterialString-
-         *                                           recipe: &lt;name&gt; -         NamesTheDeclared-
-         *                                           output.material: must    Constraint
-         *                                           not be empty
-         *
-         * material: NOT_A_MATERIAL       itself     Invalid output material   unusableMaterialKeeps-
-         *                                           for recipe: &lt;name&gt;       TheSpecificMessage
-         * </pre>
-         * The second group is not folded into the null guard: each of those shapes has a message
-         * of its own that names the offending sub-key. The two used to share the second message,
-         * which meant a blank field and a typo read identically in the log; the empty shape moved
-         * onto the {@code @NotEmpty} the field declares when UltiKits/UltiRecipe#14 made that
-         * annotation actually run (see {@link OutputItem#findConstraintViolation()}). The
-         * unusable shape did not move, and its test is the control that says so.
-         * <p>
-         * What each folded case would report without the null binding. One row per case, each
-         * measured; these are the mutation logs of the three bindings above.
-         * <pre>
-         * case                      without the null binding                        measured by
-         * -----------------------   ---------------------------------------------   -------------------
-         * ingredients absent/empty  Failed to register recipe: &lt;name&gt; -             paper-1.21.11-
-         *                           Index 0 out of bounds for length 0              probe.out, case B
-         * shape absent/empty        Recipe shape must have exactly 3 rows            MUTATION-shape-
-         *                           for: &lt;name&gt;                                     absent-keeps-the-
-         *                                                                           default
-         * output empty/no material  Failed to register recipe: &lt;name&gt; -    MUTATION-output-
-         *                           Name cannot be null                     with-no-material-kept
-         * </pre>
-         * That third row is the measurement taken for UltiKits/UltiRecipe#16, and
-         * UltiKits/UltiRecipe#14 has since moved what it would report: with the null binding removed,
-         * an output carrying no material now meets {@code @NotEmpty} first and reports {@code Invalid
-         * output for recipe: &lt;name&gt; - output.material: must not be empty} instead of the NPE
-         * the raw {@code Material.matchMaterial(null)} call produced. The row is left as it was
-         * measured, with this note, rather than rewritten to a number nobody re-ran.
-         * <p>
-         * Why the {@code ingredients} row of that second table says what it says. Measured
-         * against Paper 1.21.11 itself, bootstrapped:
-         * {@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty} replaces every shape
-         * character that has no ingredient with a space, and
-         * {@code CraftServer#addRecipe} carries no exception table around
-         * {@code addToCraftingManager}. One row per case:
-         * <pre>
-         * shape and ingredients         becomes      ShapedRecipePattern.of        probe row
-         * ---------------------------   ----------   ---------------------------   ---------
-         * "DSD" x3, S undefined         "D D" x3     accepts, width 3, height 3    case A
-         * "DDD" x3, all undefined       "   " x3     throws ArrayIndexOutOf-       case B
-         *                                            BoundsException: Index 0
-         *                                            out of bounds for length 0
-         * "DDD" x3, D defined           not run      accepts, width 3, height 3    control
-         *                                (fed direct)
-         * </pre>
-         * MockBukkit cannot observe any of that: its {@code ServerMock#addRecipe} stores the
-         * object and never reaches that code. Two earlier revisions of this paragraph were wrong
-         * here, for different reasons - {@code 485d016} stated a MockBukkit observation as server
-         * behaviour, and {@code c1c0cae} applied a real Paper measurement to a case it had not
-         * been taken on. Neither is a count of anything; both are checkable with
-         * {@code git show <sha>:src/main/java/.../RecipeConfig.java}.
-         *
-         * @param value the parsed configuration value, or an already-built definition
-         * @return the bound definition
-         * @throws IllegalArgumentException if {@code value} cannot be bound, with a message
-         *                                  naming the offending sub-key and what was found
-         */
-        public static RecipeDefinition fromConfigValue(Object value) {
-            // Unreachable from the framework's own binder, which never produces a typed value:
-            // DefaultConfigParser#parse returns a LinkedHashMap for a section, a List for a
-            // sequence and the value itself for a scalar. It is kept because a caller that
-            // already holds a definition should not be refused for holding the right type, and
-            // because module code and tests construct definitions directly. Do not read it as
-            // evidence that the framework sometimes binds the declared type - it does not.
-            //
-            // A definition handed in this way skips the binding below, so the same operator
-            // situation reports differently depending on which side it came from. One row per
-            // case; the third row is what happens when BOTH fields deviate, which the first two
-            // rows do not cover - the output constraints are read before the shape check
-            // (RecipeService:139 and :158 respectively), so only the material message appears:
-            //
-            //   hand-built definition          reports
-            //   ----------------------------   --------------------------------------------
-            //   shape left at its empty        Recipe shape must have exactly 3 rows for: <name>
-            //     default, material set
-            //   material null, shape well      Invalid output for recipe: <name> -
-            //     formed                         output.material: must not be empty
-            //   both                           Invalid output for recipe: <name> -
-            //                                    output.material: must not be empty
-            //                                    (the shape check is never reached)
-            //
-            // The two material rows read "Failed to register recipe: <name> - Name cannot be
-            // null" before UltiKits/UltiRecipe#14: a null material used to reach
-            // Material.matchMaterial(null) and surface that call's own NPE message through
-            // initRecipes' catch. The declared @NotEmpty now refuses it first, by name.
-            //
-            //   the same values written in a config file, for any of those three rows:
-            //                                  Invalid recipe definition for: <name>
-            //
-            // A property of this early return, not a defect in any of those messages.
-            if (value instanceof RecipeDefinition) {
-                return (RecipeDefinition) value;
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
             }
-            if (!(value instanceof Map)) {
-                throw RecipeProblem.of(RecipeProblem.Kind.ENTRY_EXPECTED_MAPPING, RecipeProblem.found(value))
-                        .toException();
+            if (other == null || other.getClass() != getClass()) {
+                return false;
             }
-            Map<?, ?> map = (Map<?, ?>) value;
-            RecipeDefinition definition = new RecipeDefinition();
-            Object output = map.get("output");
-            OutputItem boundOutput = output == null ? null : OutputItem.fromConfigValue(output);
-            definition.setOutput(
-                    boundOutput == null || boundOutput.getMaterial() == null ? null : boundOutput);
-            Object shape = map.get("shape");
-            List<String> boundShape = shape == null ? null : toStringList("shape", shape);
-            definition.setShape(boundShape == null || boundShape.isEmpty() ? null : boundShape);
-            Object ingredients = map.get("ingredients");
-            Map<String, String> boundIngredients =
-                    ingredients == null ? null : toStringMap("ingredients", ingredients);
-            definition.setIngredients(
-                    boundIngredients == null || boundIngredients.isEmpty() ? null : boundIngredients);
-            return definition;
+            RecipeDefinition that = (RecipeDefinition) other;
+            return Objects.equals(output, that.output)
+                    && Objects.equals(shape, that.shape)
+                    && Objects.equals(ingredients, that.ingredients);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(output, shape, ingredients);
+        }
+    }
+
+    /**
+     * A {@code recipes.<name>} value that cannot be read as a recipe, kept exactly as the operator wrote
+     * it, with the reason (UltiKits/UltiRecipe#32).
+     * <p>
+     * The framework would otherwise drop such an entry from the map with its own generic warning, which
+     * names the key and the raw value but not what is wrong with it. Carrying it instead lets
+     * {@code RecipeService} skip it with the line this module has always written, in the server's
+     * language - {@code Skipped recipe '<name>': <reason>} - and lets the converter write it back
+     * unchanged, so nothing the operator wrote is lost if the framework ever writes the map.
+     * <p>
+     * Equal to another {@code UnreadableRecipe} holding the same value as written.
+     */
+    public static final class UnreadableRecipe extends RecipeDefinition {
+
+        private final Object written;
+        private final transient RecipeProblem problem;
+
+        UnreadableRecipe(Object written, RecipeProblem problem) {
+            this.written = RecipeDefinitionConverter.copyPlain(written);
+            this.problem = problem;
+            setShape(null);
+            setIngredients(null);
+        }
+
+        /** @return the value as the operator wrote it, as a fresh copy */
+        public Object getWritten() {
+            return RecipeDefinitionConverter.copyPlain(written);
+        }
+
+        /** @return why the value cannot be read as a recipe */
+        public RecipeProblem getProblem() {
+            return problem;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof UnreadableRecipe && Objects.equals(written, ((UnreadableRecipe) other).written);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(written);
         }
     }
 
@@ -244,6 +164,7 @@ public class RecipeConfig extends AbstractConfigEntity {
      */
     @Getter
     @Setter
+    @EqualsAndHashCode
     public static class OutputItem {
         /**
          * Material name (e.g., DIAMOND_SWORD).
@@ -266,89 +187,6 @@ public class RecipeConfig extends AbstractConfigEntity {
          * Custom lore lines (supports color codes with &).
          */
         private List<String> lore;
-
-        /**
-         * Binds one parsed {@code recipes.<name>.output} value onto an {@code OutputItem}.
-         * See {@link RecipeDefinition#fromConfigValue(Object)} for why this binding is
-         * explicit.
-         *
-         * @param value the parsed configuration value, or an already-built output item
-         * @return the bound output item
-         * @throws IllegalArgumentException if {@code value} cannot be bound
-         */
-        public static OutputItem fromConfigValue(Object value) {
-            if (value instanceof OutputItem) {
-                return (OutputItem) value;
-            }
-            if (!(value instanceof Map)) {
-                throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_MAPPING, "output", RecipeProblem.found(value))
-                        .toException();
-            }
-            Map<?, ?> map = (Map<?, ?>) value;
-            OutputItem item = new OutputItem();
-            Object material = map.get("material");
-            if (material != null) {
-                item.setMaterial(asText("output.material", material));
-            }
-            // Deliberate asymmetry, recorded so the next reader does not take one half for the
-            // house style: material and name accept any SCALAR (asText refuses a mapping or a
-            // list), because a material name is text and Material.matchMaterial judges it;
-            // amount refuses anything but a whole number, because silently coercing a stack size
-            // is how an operator ends up with a quantity they did not write: amount: "1" quoted as
-            // text skips the whole entry, and so does amount: 2.5, named as written rather than
-            // truncated to 2 (UltiKits/UltiRecipe#24, maintainer decision 2026-09-27).
-            Object amount = map.get("amount");
-            if (amount != null) {
-                if (!(amount instanceof Number)) {
-                    throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_NUMBER, "output.amount",
-                            RecipeProblem.found(amount)).toException();
-                }
-                item.setAmount(wholeAmount((Number) amount));
-            }
-            Object name = map.get("name");
-            if (name != null) {
-                item.setName(asText("output.name", name));
-            }
-            Object lore = map.get("lore");
-            if (lore != null) {
-                item.setLore(toStringList("output.lore", lore));
-            }
-            return item;
-        }
-
-        /**
-         * The whole number {@code amount} as written, for {@code output.amount}.
-         * <p>
-         * {@code intValue()} used to truncate {@code 2.5} to 2 and {@code 0.5} to 0 without a word,
-         * and wrapped a whole number too large for an {@code int}. A value with a fractional part is
-         * refused, quoting the value as written; {@code 2.0} is the whole number 2; a whole number
-         * outside the {@code int} range is refused as out of the field's declared range, again as
-         * written, since no stack size can hold it (UltiKits/UltiRecipe#24).
-         */
-        private static int wholeAmount(Number amount) {
-            BigDecimal exact;
-            try {
-                exact = new BigDecimal(amount.toString());
-            } catch (NumberFormatException e) {
-                // Infinity and NaN have no decimal form, and are no stack size
-                throw RecipeProblem.of(RecipeProblem.Kind.NOT_WHOLE_NUMBER, "output.amount", amount).toException();
-            }
-            if (exact.signum() != 0 && exact.stripTrailingZeros().scale() > 0) {
-                throw RecipeProblem.of(RecipeProblem.Kind.NOT_WHOLE_NUMBER, "output.amount", amount).toException();
-            }
-            if (exact.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0
-                    || exact.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
-                Range range;
-                try {
-                    range = OutputItem.class.getDeclaredField("amount").getAnnotation(Range.class);
-                } catch (NoSuchFieldException e) {
-                    throw new IllegalStateException("OutputItem has no amount field", e);
-                }
-                throw RecipeProblem.of(RecipeProblem.Kind.OUT_OF_RANGE, "output.amount", amount,
-                        describeBound(range.min()), describeBound(range.max())).toException();
-            }
-            return exact.intValueExact();
-        }
 
         /**
          * Describes the first declared configuration constraint this output item violates, or
@@ -422,82 +260,12 @@ public class RecipeConfig extends AbstractConfigEntity {
          * @param value the bound
          * @return the bound without a redundant fractional part
          */
-        private static String describeBound(double value) {
+        static String describeBound(double value) {
             if (value == Math.rint(value) && !Double.isInfinite(value)
                     && Math.abs(value) < (double) Long.MAX_VALUE) {
                 return Long.toString((long) value);
             }
             return Double.toString(value);
         }
-    }
-
-    /**
-     * Binds a parsed list value onto a list of strings.
-     *
-     * @param field the sub-key being bound, used in the failure message
-     * @param value the parsed configuration value
-     * @return the bound list
-     * @throws IllegalArgumentException if the value is not a list, or holds a null element
-     */
-    private static List<String> toStringList(String field, Object value) {
-        if (!(value instanceof List)) {
-            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_LIST, field, RecipeProblem.found(value)).toException();
-        }
-        List<String> result = new ArrayList<>();
-        for (Object element : (List<?>) value) {
-            if (element == null) {
-                throw RecipeProblem.of(RecipeProblem.Kind.EMPTY_ENTRY, field).toException();
-            }
-            result.add(asText(field, element));
-        }
-        return result;
-    }
-
-    /**
-     * Binds a parsed mapping value onto a map of strings, preserving the file's own order.
-     *
-     * @param field the sub-key being bound, used in the failure message
-     * @param value the parsed configuration value
-     * @return the bound map
-     * @throws IllegalArgumentException if the value is not a mapping, or holds a null value
-     */
-    private static Map<String, String> toStringMap(String field, Object value) {
-        if (!(value instanceof Map)) {
-            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_MAPPING, field, RecipeProblem.found(value)).toException();
-        }
-        Map<String, String> result = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-            if (entry.getValue() == null) {
-                throw RecipeProblem.of(RecipeProblem.Kind.NO_VALUE, field + "." + entry.getKey()).toException();
-            }
-            result.put(String.valueOf(entry.getKey()),
-                       asText(field + "." + entry.getKey(), entry.getValue()));
-        }
-        return result;
-    }
-
-    /**
-     * Binds a parsed scalar onto text.
-     * <p>
-     * Every caller of this method used to call {@code String.valueOf} directly, which renders a
-     * {@code Map} or {@code List} as Java text - an indentation mistake under {@code name:}
-     * became the display name {@code {text=Blade}} and the recipe registered with no warning
-     * (measured). A compound value cannot be read as text, so it is refused here like any other
-     * structural mismatch. Scalars are unaffected, which is why {@code material: ""} and {@code
-     * material: NOT_A_MATERIAL} still bind, and are still judged afterwards rather than here:
-     * the empty one by the {@code @NotEmpty} the field declares ({@link
-     * OutputItem#findConstraintViolation()}, UltiKits/UltiRecipe#14), the unusable one by
-     * {@code Material.matchMaterial} as before.
-     *
-     * @param field the sub-key being bound, used in the failure message
-     * @param value the parsed configuration value, never {@code null}
-     * @return the value as text
-     * @throws IllegalArgumentException if the value is a mapping or a list
-     */
-    private static String asText(String field, Object value) {
-        if (value instanceof Map || value instanceof List) {
-            throw RecipeProblem.of(RecipeProblem.Kind.EXPECTED_TEXT, field, RecipeProblem.found(value)).toException();
-        }
-        return String.valueOf(value);
     }
 }
