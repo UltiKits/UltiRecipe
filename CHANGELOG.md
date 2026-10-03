@@ -71,14 +71,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - When `/ul reload UltiRecipe` cannot read `config/recipes.yml` again, the module now records it in the
   framework's reload report, so the reply says the reload was partial and names the file and the error
   instead of a plain success; the recipes loaded before stay registered, as before (UltiKits/UltiRecipe#30).
-  On UltiTools-API 6.3.0 as it stands, no re-read failure reaches the module at all: the framework keeps an
-  invalid or unreadable file back itself and `reload()` returns normally, so the reply is still a plain
-  success in every case until UltiKits/UltiTools-Reborn#589 is resolved; the module's own `/recipe reload` reply is tracked separately as
-  UltiKits/UltiRecipe#33.
+  An invalid or unreadable file counts: UltiTools-API 6.3.0 reports it to the module by throwing
+  `ConfigurationException` from the re-read and leaving the configuration as it was
+  (UltiKits/UltiTools-Reborn#589), and the module records that exactly like a read error.
 - `/ul reload UltiRecipe` 无法重新读取 `config/recipes.yml` 时，本模块现在会把它记进框架的重载报告，回复会说明这次重载只完成了一部分，
-  并写明文件和错误，而不是一律回复成功；之前加载的配方仍然有效（UltiKits/UltiRecipe#30）。在目前的 UltiTools-API 6.3.0 上，任何重新读取失败都到不了
-  模块：YAML 写错或文件不可读时框架自行保留旧值，`reload()` 正常返回，因此在 UltiKits/UltiTools-Reborn#589 解决之前回复在所有情况下仍是成功；模块自己的
-  `/recipe reload` 回复由 UltiKits/UltiRecipe#33 单独跟踪。
+  并写明文件和错误，而不是一律回复成功；之前加载的配方仍然有效（UltiKits/UltiRecipe#30）。YAML 写错或文件不可读也算在内：
+  UltiTools-API 6.3.0 会在重新读取时抛出 `ConfigurationException` 并保持配置不变（UltiKits/UltiTools-Reborn#589），本模块把它当作读取错误同样记录。
 
 - A recipe in `config/recipes.yml` whose `shape` uses a letter with no entry under `ingredients` is no
   longer registered, and a console warning names the recipe and the letter as written, for example

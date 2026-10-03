@@ -7,6 +7,7 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.exceptions.ConfigurationException;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -345,6 +346,11 @@ public class RecipeService {
      * {@link ReloadReport#partial(String)}, naming the file and the error, so {@code /ul reload UltiRecipe}
      * replies that the reload was partial instead of a plain success (UltiKits/UltiRecipe#30, framework
      * UltiTools-Reborn#529). The recipes loaded before are still registered again, as before.
+     * <p>
+     * Two failures count as "could not be read again": an {@code IOException}, and the
+     * {@code ConfigurationException} the framework throws for an unreadable or unparseable file once
+     * UltiTools-Reborn#589 is fixed, leaving the configuration as it was. Both are recorded the same way;
+     * neither fails the reload.
      *
      * @param report the report the framework handed to the module's reload hook
      * @return the number of recipes registered after reload
@@ -352,7 +358,7 @@ public class RecipeService {
     public int reloadRecipes(ReloadReport report) {
         try {
             config.reload();
-        } catch (IOException e) {
+        } catch (IOException | ConfigurationException e) {
             getLogger().warn(String.format(plugin.i18n("recipe.log.config_reload_failed"), e.getMessage()));
             report.partial(String.format(plugin.i18n("recipe.reload.partial_config"), e.getMessage()));
         }
