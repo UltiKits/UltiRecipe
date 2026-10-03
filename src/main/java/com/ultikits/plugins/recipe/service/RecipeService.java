@@ -2,6 +2,7 @@ package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.plugins.recipe.config.RecipeProblem;
+import com.ultikits.ultitools.abstracts.ReloadReport;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
@@ -335,10 +336,25 @@ public class RecipeService {
      * @return the number of recipes registered after reload
      */
     public int reloadRecipes() {
+        return reloadRecipes(new ReloadReport());
+    }
+
+    /**
+     * Reloads all recipes as {@link #reloadRecipes()} does, and records in {@code report} what did not
+     * reload: a {@code config/recipes.yml} that could not be read again is recorded with
+     * {@link ReloadReport#partial(String)}, naming the file and the error, so {@code /ul reload UltiRecipe}
+     * replies that the reload was partial instead of a plain success (UltiKits/UltiRecipe#30, framework
+     * UltiTools-Reborn#529). The recipes loaded before are still registered again, as before.
+     *
+     * @param report the report the framework handed to the module's reload hook
+     * @return the number of recipes registered after reload
+     */
+    public int reloadRecipes(ReloadReport report) {
         try {
             config.reload();
         } catch (IOException e) {
             getLogger().warn(String.format(plugin.i18n("recipe.log.config_reload_failed"), e.getMessage()));
+            report.partial(String.format(plugin.i18n("recipe.reload.partial_config"), e.getMessage()));
         }
         removeRecipes();
         return initRecipes();

@@ -68,6 +68,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   写入英文注释（此前所有语言下都是中文）。已有文件中这两项的注释会在下次启动时切换为服务器语言；配置值不变，你手写在这两项上方的
   注释会被替换（UltiKits/UltiRecipe#31）。
 
+- When `/ul reload UltiRecipe` cannot read `config/recipes.yml` again, the module now records it in the
+  framework's reload report, so the reply says the reload was partial and names the file and the error
+  instead of a plain success; the recipes loaded before stay registered, as before (UltiKits/UltiRecipe#30).
+  On UltiTools-API 6.3.0 as it stands, an invalid or unreadable file is kept back by the framework without
+  telling the module, so in those two cases the reply is still a plain success until
+  UltiKits/UltiTools-Reborn#589 is resolved; the module's own `/recipe reload` reply is tracked separately as
+  UltiKits/UltiRecipe#33.
+- `/ul reload UltiRecipe` 无法重新读取 `config/recipes.yml` 时，本模块现在会把它记进框架的重载报告，回复会说明这次重载只完成了一部分，
+  并写明文件和错误，而不是一律回复成功；之前加载的配方仍然有效（UltiKits/UltiRecipe#30）。在目前的 UltiTools-API 6.3.0 上，YAML 写错或
+  文件不可读时框架会自行保留旧值而不告诉模块，因此这两种情况下在 UltiKits/UltiTools-Reborn#589 解决之前回复仍是成功；模块自己的
+  `/recipe reload` 回复由 UltiKits/UltiRecipe#33 单独跟踪。
+
 - A recipe in `config/recipes.yml` whose `shape` uses a letter with no entry under `ingredients` is no
   longer registered, and a console warning names the recipe and the letter as written, for example
   `Recipe 'sword' not registered: shape letter 'S' has no ingredient`; every such letter is named once.

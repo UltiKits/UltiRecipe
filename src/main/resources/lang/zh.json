@@ -8,6 +8,7 @@
   "recipe.list.header": "§6=== 已注册的配方 ===",
   "recipe.list.total": "§7共 §f%d §7个配方",
   "recipe.reload.success": "§a配方已重载！共 %d 个配方",
+  "recipe.reload.partial_config": "无法重新读取 config/recipes.yml（%s），之前加载的配方继续有效",
   "recipe.count.current": "§7当前已注册 §f%d §7个配方",
 
   "recipe.help.header": "§6=== UltiRecipe 帮助 ===",
