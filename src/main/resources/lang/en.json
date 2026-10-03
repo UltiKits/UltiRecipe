@@ -8,6 +8,8 @@
   "recipe.list.header": "§6=== Registered Recipes ===",
   "recipe.list.total": "§7Total §f%d §7recipes",
   "recipe.reload.success": "§aRecipes reloaded! %d recipes total",
+  "recipe.reload.partial": "§eRecipes reloaded only in part, %d recipes total: %s",
+  "recipe.reload.partial_config": "config/recipes.yml could not be read again (%s); the recipes loaded before stay registered",
   "recipe.count.current": "§7Currently §f%d §7recipes registered",
 
   "recipe.help.header": "§6=== UltiRecipe Help ===",
@@ -25,6 +27,7 @@
   "recipe.log.refused_shape_rows": "Recipe '%s' not registered: the shape must have exactly 3 rows, found %s",
   "recipe.log.refused_ingredient_key": "Recipe '%s' not registered: ingredient key '%s' is not a single character",
   "recipe.log.refused_ingredient_material": "Recipe '%s' not registered: ingredient '%s' names an unknown material '%s'",
+  "recipe.log.refused_shape_letter": "Recipe '%s' not registered: shape letter '%s' has no ingredient",
   "recipe.log.registered": "Registered recipe: %s",
   "recipe.log.removed": "Removed recipe: %s",
   "recipe.log.config_reload_failed": "Could not read config/recipes.yml again, so the recipes loaded before are registered again: %s",
@@ -43,5 +46,7 @@
   "recipe.found.list": "a list",
   "recipe.found.number": "a number",
   "recipe.found.boolean": "a true/false value",
-  "recipe.found.text": "the text '%s'"
+  "recipe.found.text": "the text '%s'",
+  "recipe.config.recipes.enabled": "Whether the custom recipe feature is enabled",
+  "recipe.config.recipes.recipes": "List of custom recipes"
 }

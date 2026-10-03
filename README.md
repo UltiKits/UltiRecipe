@@ -87,7 +87,7 @@ recipes:
 
 - 形状由 3 行字符串组成，每行 3 个字符
 - 空格 ` ` 表示该位置不需要放置物品
-- 其他字符在 `ingredients` 中定义对应的材料
+- 其他字符在 `ingredients` 中定义对应的材料；形状里用到、却没有在 `ingredients` 中定义的字母会让该配方不注册，控制台警告会点名配方和这个字母（Every other character must be defined under `ingredients`; a shape letter with no entry there keeps the recipe unregistered, and a console warning names the recipe and the letter.）
 
 ### 示例配方
 
