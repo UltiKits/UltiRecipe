@@ -43,5 +43,7 @@
   "recipe.found.list": "a list",
   "recipe.found.number": "a number",
   "recipe.found.boolean": "a true/false value",
-  "recipe.found.text": "the text '%s'"
+  "recipe.found.text": "the text '%s'",
+  "recipe.config.recipes.enabled": "Whether the custom recipe feature is enabled",
+  "recipe.config.recipes.recipes": "List of custom recipes"
 }

@@ -43,5 +43,7 @@
   "recipe.found.list": "列表",
   "recipe.found.number": "数字",
   "recipe.found.boolean": "真假值",
-  "recipe.found.text": "文本 '%s'"
+  "recipe.found.text": "文本 '%s'",
+  "recipe.config.recipes.enabled": "是否启用自定义配方功能",
+  "recipe.config.recipes.recipes": "自定义配方列表"
 }

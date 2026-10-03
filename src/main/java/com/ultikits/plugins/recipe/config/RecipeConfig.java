@@ -48,10 +48,10 @@ import lombok.Setter;
 @ConfigEntity("config/recipes.yml")
 public class RecipeConfig extends AbstractConfigEntity {
 
-    @ConfigEntry(path = "enabled", comment = "是否启用自定义配方功能")
+    @ConfigEntry(path = "enabled", comment = "{recipe.config.recipes.enabled}")
     private boolean enabled = true;
 
-    @ConfigEntry(path = "recipes", comment = "自定义配方列表")
+    @ConfigEntry(path = "recipes", comment = "{recipe.config.recipes.recipes}")
     private Map<String, RecipeDefinition> recipes = new HashMap<>();
 
     public RecipeConfig(String configFilePath) {

@@ -59,6 +59,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Skipped recipe '<名称>': ingredients.D: has no value` 跳过该配方（此前它会消失，配方要么被当成无效定义拒绝，要么在有其他配料时
   让那个形状字母变成空格）。本版本必须与 UltiTools-API 6.3.0 一同发布（UltiKits/UltiRecipe#32）。
 
+- The comments above the two keys of `config/recipes.yml` (`enabled`, `recipes`) now come from the
+  module's language files: a server set to `language: en` writes English comments on a fresh install
+  (they were Chinese in every language). An existing file's comments on these two keys switch to the
+  server's language at the next start; values are untouched, and a comment you wrote by hand above one
+  of these keys is replaced (UltiKits/UltiRecipe#31).
+- `config/recipes.yml` 中两个配置项（`enabled`、`recipes`）上方的注释现在取自模块的语言文件：`language: en` 的服务器全新安装时
+  写入英文注释（此前所有语言下都是中文）。已有文件中这两项的注释会在下次启动时切换为服务器语言；配置值不变，你手写在这两项上方的
+  注释会被替换（UltiKits/UltiRecipe#31）。
+
 - A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
   warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,
   found 2.5`. It used to be truncated without a word, so `2.5` registered a stack of 2, and `0.5` was
