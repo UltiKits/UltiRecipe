@@ -25,6 +25,7 @@
   "recipe.log.refused_shape_rows": "Recipe '%s' not registered: the shape must have exactly 3 rows, found %s",
   "recipe.log.refused_ingredient_key": "Recipe '%s' not registered: ingredient key '%s' is not a single character",
   "recipe.log.refused_ingredient_material": "Recipe '%s' not registered: ingredient '%s' names an unknown material '%s'",
+  "recipe.log.refused_shape_letter": "Recipe '%s' not registered: shape letter '%s' has no ingredient",
   "recipe.log.registered": "Registered recipe: %s",
   "recipe.log.removed": "Removed recipe: %s",
   "recipe.log.config_reload_failed": "Could not read config/recipes.yml again, so the recipes loaded before are registered again: %s",

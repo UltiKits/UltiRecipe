@@ -68,6 +68,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   写入英文注释（此前所有语言下都是中文）。已有文件中这两项的注释会在下次启动时切换为服务器语言；配置值不变，你手写在这两项上方的
   注释会被替换（UltiKits/UltiRecipe#31）。
 
+- A recipe in `config/recipes.yml` whose `shape` uses a letter with no entry under `ingredients` is no
+  longer registered, and a console warning names the recipe and the letter as written, for example
+  `Recipe 'sword' not registered: shape letter 'S' has no ingredient`; every such letter is named once.
+  The server used to turn that letter into an empty slot, so the recipe crafted from a pattern nobody
+  wrote (UltiKits/UltiRecipe#29).
+- `config/recipes.yml` 中 `shape` 用到了 `ingredients` 下没有的字母的配方不再注册，控制台警告会点名该配方和按原样书写的字母，例如
+  `Recipe 'sword' not registered: shape letter 'S' has no ingredient`；每个这样的字母只点名一次。此前服务器会把该字母当成空格，
+  配方变成按一个谁也没写过的图案合成（UltiKits/UltiRecipe#29）。
+
 - A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
   warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,
   found 2.5`. It used to be truncated without a word, so `2.5` registered a stack of 2, and `0.5` was

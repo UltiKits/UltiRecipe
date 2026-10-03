@@ -228,6 +228,20 @@ public class RecipeService {
 
             resolved.put(charKey.charAt(0), material);
         }
+        // Every shape letter needs an entry under ingredients. Paper turns a letter without one into an
+        // empty slot (CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty), so registering it anyway
+        // made a recipe that crafts from a pattern the operator never wrote. Each missing letter is named
+        // once, as written, in the order the shape first uses it (UltiKits/UltiRecipe#29, maintainer
+        // rule of 2026-09-27); a space is an empty slot, not a letter.
+        Set<Character> named = new LinkedHashSet<>();
+        for (String row : shape) {
+            for (char letter : row.toCharArray()) {
+                if (letter != ' ' && !ingredients.containsKey(String.valueOf(letter)) && named.add(letter)) {
+                    getLogger().warn(String.format(plugin.i18n("recipe.log.refused_shape_letter"), name, letter));
+                    usable = false;
+                }
+            }
+        }
         if (!usable) {
             return false;
         }
