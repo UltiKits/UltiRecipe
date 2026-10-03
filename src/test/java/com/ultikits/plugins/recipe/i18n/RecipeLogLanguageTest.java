@@ -71,7 +71,8 @@ class RecipeLogLanguageTest {
     /** Loads a {@code recipes.yml} body through the framework, as a module start does (UltiKits/UltiRecipe#32). */
     private void givenRecipesYml(String yml) throws Exception {
         FrameworkRecipeConfig.write(tempDir, yml);
-        when(config.getRecipes()).thenReturn(FrameworkRecipeConfig.load(tempDir, "zh").getRecipes());
+        RecipeConfig loaded = FrameworkRecipeConfig.load(tempDir, "zh");
+        when(config.getRecipes()).thenReturn(loaded.getRecipes());
     }
 
     private static String recipe(String name, String material, String amount, String... shapeAndIngredients) {
