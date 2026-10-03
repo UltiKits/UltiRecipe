@@ -86,11 +86,11 @@ count alone:
 |---|---|---|
 | `@CmdExecutor` | 1 | `RecipeCommand.java:33`, class-level, `alias = {"recipe", "ultirecipe"}` |
 | `@CmdMapping` | 3 | `RecipeCommand.java:57` (`list`), `:76` (`reload`), `:85` (`count`) |
-| `@EventListener` | 0 | no event-driven behaviour exists anywhere in this module's 5 source files — confirmed by reading all 5 in full, not merely by an absent grep hit |
+| `@EventListener` | 0 | no event-driven behaviour exists anywhere in this module's 6 source files — confirmed by reading all 6 in full, not merely by an absent grep hit |
 | `@Scheduled` | 0 | same — no background task exists in this module |
-| `@ConfigEntity` | 1 | `RecipeConfig.java:47`, `@ConfigEntity("config/recipes.yml")` |
-| `@ConditionalOnConfig` | 2 | `RecipeCommand.java:38` (gates the command class) and `RecipeService.java:34` (gates the service bean) — both read the same key, `config/recipes.yml`'s `enabled`, but are two independent annotation sites gating two independent beans |
-| `@ConfigEntry` | 2 | `RecipeConfig.java:50` (`enabled`) and `:53` (`recipes`) |
+| `@ConfigEntity` | 1 | `RecipeConfig.java:48`, `@ConfigEntity("config/recipes.yml")` |
+| `@ConditionalOnConfig` | 2 | `RecipeCommand.java:38` (gates the command class) and `RecipeService.java:36` (gates the service bean) — both read the same key, `config/recipes.yml`'s `enabled`, but are two independent annotation sites gating two independent beans |
+| `@ConfigEntry` | 2 | `RecipeConfig.java:51` (`enabled`) and `:54` (`recipes`) |
 | `@Table` | 0 | no ORM entity exists in this module — recipe state lives entirely in `recipes.yml` and Bukkit's own live crafting-recipe registry, never a database row |
 
 This document's command-row count (3) matches the `@CmdMapping` site count exactly (3 against 3).
