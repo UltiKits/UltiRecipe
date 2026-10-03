@@ -220,6 +220,15 @@ class RecipeLogLanguageTest {
     }
 
     @Test
+    @DisplayName("a shape letter with no ingredient (UltiKits/UltiRecipe#29)")
+    void shapeLetterWithoutIngredient() throws Exception {
+        givenRecipesYml(recipe("no_s", "DIAMOND", null, "    shape:", "      - \"DSD\"", "      - \"DSD\"",
+                "      - \"DSD\"", "    ingredients:", "      D: DIAMOND"));
+        service.initRecipes();
+        assertThat(warnings()).containsExactly(zh("recipe.log.refused_shape_letter", "no_s", "S"));
+    }
+
+    @Test
     @DisplayName("a registered recipe, then its removal")
     void registeredAndRemoved() throws Exception {
         givenRecipesYml(recipe("good_one", "DIAMOND", null, THREE_ROWS_D));

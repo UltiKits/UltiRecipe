@@ -773,8 +773,11 @@ class RecipeYamlLoadTest {
                     + "      DD: DIAMOND\n");
 
             assertThat(service.initRecipes()).isZero();
+            // Since UltiKits/UltiRecipe#29 the shape letter the unusable key left without an ingredient
+            // is named too, in the same pass.
             assertThat(warnings()).containsExactly(
-                    "Recipe 'wide_key' not registered: ingredient key 'DD' is not a single character");
+                    "Recipe 'wide_key' not registered: ingredient key 'DD' is not a single character",
+                    "Recipe 'wide_key' not registered: shape letter 'D' has no ingredient");
             assertThat(service.getRecipeList()).isEmpty();
         }
 
@@ -1164,6 +1167,78 @@ class RecipeYamlLoadTest {
             // the registry key is lower-cased, as every NamespacedKey is
             assertThat(service.getRecipeList()).containsExactly("custom_sword");
             assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
+        }
+    }
+
+    // --- UltiKits/UltiRecipe#29 ------------------------------------------------------------
+
+    /**
+     * A shape letter with no entry under {@code ingredients} keeps the recipe unregistered, and a warning
+     * names the recipe and the letter exactly as written (UltiKits/UltiRecipe#29, maintainer rule of
+     * 2026-09-27). Paper turns every shape character without an ingredient into an empty slot
+     * ({@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty}, measured for UltiKits/UltiRecipe#21),
+     * so registering it anyway made a recipe that crafts from a pattern the operator never wrote.
+     */
+    @Nested
+    @DisplayName("a shape letter with no ingredient keeps the recipe unregistered, naming the letter (UltiKits/UltiRecipe#29)")
+    class ShapeLetterWithoutIngredient {
+
+        private String entry(String name, String rows, String ingredients) {
+            String[] row = rows.split("\\|");
+            return "  " + name + ":\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"" + row[0] + "\"\n"
+                    + "      - \"" + row[1] + "\"\n"
+                    + "      - \"" + row[2] + "\"\n"
+                    + "    ingredients:\n"
+                    + ingredients;
+        }
+
+        @Test
+        @DisplayName("S in the shape, no S under ingredients: not registered, S named; a good neighbour still registers")
+        void missingLetterIsRefused() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("missing_letter", "DSD|DSD|DSD", "      D: DIAMOND\n") + GOOD_ENTRY);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'missing_letter' not registered: shape letter 'S' has no ingredient");
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info("Registered recipe: missing_letter");
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(Bukkit.getRecipe(new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(),
+                    "ultirecipe_missing_letter"))).isNull();
+        }
+
+        @Test
+        @DisplayName("every missing letter is named once, in the order the shape first uses it")
+        void everyMissingLetterIsNamedOnce() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("two_missing", "ABA|CAC|ABA", "      A: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'two_missing' not registered: shape letter 'B' has no ingredient",
+                    "Recipe 'two_missing' not registered: shape letter 'C' has no ingredient");
+        }
+
+        @Test
+        @DisplayName("the letter is named exactly as written: a lower-case d is not the D under ingredients")
+        void letterIsNamedAsWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("lower", "dDd|dDd|dDd", "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'lower' not registered: shape letter 'd' has no ingredient");
+        }
+
+        @Test
+        @DisplayName("control: a space is an empty slot, not a letter, and every letter defined registers")
+        void spacesAreEmptySlots() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("spaced", " D | D | D ", "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings()).isEmpty();
+            assertThat(registered("spaced").getResult().getType()).isEqualTo(Material.DIAMOND);
         }
     }
 
