@@ -8,6 +8,7 @@
   "recipe.list.header": "§6=== Registered Recipes ===",
   "recipe.list.total": "§7Total §f%d §7recipes",
   "recipe.reload.success": "§aRecipes reloaded! %d recipes total",
+  "recipe.reload.partial": "§eRecipes reloaded only in part, %d recipes total: %s",
   "recipe.reload.partial_config": "config/recipes.yml could not be read again (%s); the recipes loaded before stay registered",
   "recipe.count.current": "§7Currently §f%d §7recipes registered",
 

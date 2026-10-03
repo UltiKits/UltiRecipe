@@ -78,6 +78,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   并写明文件和错误，而不是一律回复成功；之前加载的配方仍然有效（UltiKits/UltiRecipe#30）。YAML 写错或文件不可读也算在内：
   UltiTools-API 6.3.0 会在重新读取时抛出 `ConfigurationException` 并保持配置不变（UltiKits/UltiTools-Reborn#589），本模块把它当作读取错误同样记录。
 
+- `/recipe reload` no longer replies `Recipes reloaded!` when `config/recipes.yml` could not be read again
+  (an unreadable file, invalid YAML): it replies `Recipes reloaded only in part, <n> recipes total: <reason>`,
+  where the reason names the file and the error, and the recipes loaded before stay registered
+  (UltiKits/UltiRecipe#33).
+- 重新读取 `config/recipes.yml` 失败（文件不可读、YAML 写错）时，`/recipe reload` 不再回复「配方已重载！」，而是回复
+  `配方只重载了一部分，共 <n> 个配方：<原因>`，原因写明文件和错误；之前加载的配方仍然有效（UltiKits/UltiRecipe#33）。
+
 - A recipe in `config/recipes.yml` whose `shape` uses a letter with no entry under `ingredients` is no
   longer registered, and a console warning names the recipe and the letter as written, for example
   `Recipe 'sword' not registered: shape letter 'S' has no ingredient`; every such letter is named once.

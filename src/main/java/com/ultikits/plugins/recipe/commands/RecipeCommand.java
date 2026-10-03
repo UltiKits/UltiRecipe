@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe.commands;
 
 import com.ultikits.plugins.recipe.service.RecipeService;
+import com.ultikits.ultitools.abstracts.ReloadReport;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.annotations.Autowired;
@@ -72,10 +73,20 @@ public class RecipeCommand extends BaseCommandExecutor {
 
     /**
      * Reload recipes from configuration.
+     * <p>
+     * A re-read of {@code config/recipes.yml} that failed is not a success: the reply says the reload was
+     * partial and gives the count still registered and the reason, as {@code /ul reload UltiRecipe} does
+     * through the framework's reload report (UltiKits/UltiRecipe#33, #30).
      */
     @CmdMapping(format = "reload")
     public void reloadRecipes(@CmdSender CommandSender sender) {
-        int count = recipeService.reloadRecipes();
+        ReloadReport report = new ReloadReport();
+        int count = recipeService.reloadRecipes(report);
+        if (report.isPartial()) {
+            sender.sendMessage(String.format(i18n("recipe.reload.partial"), count,
+                    String.join("; ", report.getPartialReasons())));
+            return;
+        }
         sender.sendMessage(String.format(i18n("recipe.reload.success"), count));
     }
 
