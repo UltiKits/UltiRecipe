@@ -6,6 +6,7 @@ import com.ultikits.plugins.recipe.service.RecipeService;
 import com.ultikits.ultitools.abstracts.ReloadReport;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.context.SimpleContainer;
+import com.ultikits.ultitools.exceptions.ConfigurationException;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 
 import org.junit.jupiter.api.AfterEach;
@@ -114,6 +115,30 @@ class UltiRecipePartialReloadTest {
                 "config/recipes.yml could not be read again (disk gone); the recipes loaded before stay registered");
         assertThat(warnings()).as("the console still names the error, as before").containsExactly(
                 "Could not read config/recipes.yml again, so the recipes loaded before are registered again: disk gone");
+    }
+
+    /**
+     * The framework's contract once UltiTools-Reborn#589 is fixed (supervisor decision, recorded in
+     * 17-DECISIONS-FU.md): {@code reload()} of an unreadable or unparseable file leaves the configuration
+     * as it was and throws {@code ConfigurationException} naming the file and the cause. The module must
+     * treat it exactly like a failed read: record it, keep the recipes loaded before, not fail the reload.
+     */
+    @Test
+    @DisplayName("reload() throwing ConfigurationException (an unreadable or invalid file): partial, recipes kept, reload not failed")
+    void configurationExceptionIsReportedAsPartial() throws Exception {
+        ConfigurationException failure = new ConfigurationException(
+                "Cannot load config/recipes.yml: invalid YAML at line 2, column 6");
+        doThrow(failure).when(config).reload();
+
+        ReloadReport report = reload();
+
+        assertThat(report.isPartial()).isTrue();
+        assertThat(report.getPartialReasons()).containsExactly("config/recipes.yml could not be read again ("
+                + failure.getMessage() + "); the recipes loaded before stay registered");
+        assertThat(warnings()).containsExactly(
+                "Could not read config/recipes.yml again, so the recipes loaded before are registered again: "
+                        + failure.getMessage());
+        verify(logger).info("Recipes reloaded, 0 recipes total");
     }
 
     @Test
