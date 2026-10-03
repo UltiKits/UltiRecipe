@@ -430,7 +430,7 @@ class RecipeCommandTest {
 
             command.reloadRecipes(sender);
 
-            verify(service, times(1)).reloadRecipes();
+            verify(service, times(1)).reloadRecipes(any(ReloadReport.class));
         }
 
         @Test
