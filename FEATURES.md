@@ -144,9 +144,11 @@ bodies moved verbatim. `/ul reload UltiRecipe` (the framework's own command, not
 "do not add a row for a command this repository does not itself map" boundary the framework's own
 `FEATURES.md` states for `/upm help`) now runs, in order: `ConfigManager#reloadConfigs`, the
 module's `language` object refresh, `ConditionalRegistrationEvaluator`'s drift report for either
-of this module's two gates above, the framework's own `Module 'UltiRecipe' reloaded.` INFO line,
-and finally `onReload()` — which re-registers this module's recipes and logs its own count line,
-exactly as before. (The drift report and the `Module 'UltiRecipe' reloaded.` line are new in
+of this module's two gates above, and finally `onReload()` — which re-registers this module's
+recipes and logs its own count line, exactly as before. Only after `onReload()` has returned does
+the framework log its own `Module 'UltiRecipe' reloaded.` INFO line (UltiKits/UltiTools-Reborn#529),
+so the module's count line comes first; a reload in which a step failed logs a SEVERE line, and a
+partial one a WARNING, instead of that success line. (The drift report and the `Module 'UltiRecipe' reloaded.` line are new in
 UltiTools 6.3.0; they did not exist in 6.2.5.) Unloading the module (`/upm uninstall UltiRecipe`
 or server shutdown, both of which call `unregisterSelf()`) now runs `onUnregister()` (removing
 every custom recipe, as before) followed by the framework's own command unregistration and then
