@@ -61,12 +61,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The comments above the two keys of `config/recipes.yml` (`enabled`, `recipes`) now come from the
   module's language files: a server set to `language: en` writes English comments on a fresh install
-  (they were Chinese in every language). An existing file's comments on these two keys switch to the
-  server's language at the next start; values are untouched, and a comment you wrote by hand above one
-  of these keys is replaced (UltiKits/UltiRecipe#31).
+  (they were Chinese in every language). The comments the framework wrote on these two keys, the Chinese
+  ones earlier versions wrote included, switch to the server's language at the next start, and after you
+  change `language` and run `/ul reload`; values are untouched, and a comment you wrote yourself is kept as
+  you wrote it (UltiKits/UltiTools-Reborn#611) (UltiKits/UltiRecipe#31).
 - `config/recipes.yml` 中两个配置项（`enabled`、`recipes`）上方的注释现在取自模块的语言文件：`language: en` 的服务器全新安装时
-  写入英文注释（此前所有语言下都是中文）。已有文件中这两项的注释会在下次启动时切换为服务器语言；配置值不变，你手写在这两项上方的
-  注释会被替换（UltiKits/UltiRecipe#31）。
+  写入英文注释（此前所有语言下都是中文）。框架在这两项上写下的注释（包括旧版本写下的中文注释）会在下次启动时、以及你修改
+  `language` 并执行 `/ul reload` 后切换为服务器语言；配置值不变，你自己写的注释保持原样（UltiKits/UltiTools-Reborn#611）
+  （UltiKits/UltiRecipe#31）。
 
 - `/ul reload UltiRecipe` no longer replies a plain success when `config/recipes.yml` cannot be read again.
   An invalid or unreadable file is caught by the framework's own configuration reload, which runs before
