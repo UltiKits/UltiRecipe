@@ -16,11 +16,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （UltiKits/UltiRecipe#27）。
 
 - Language keys were renamed from Chinese sentences to ASCII keys (for example `recipe.help.header`).
-  An operator who edited this module's `lang/en.json` or `lang/zh.json` must re-apply those edits to
-  the new keys; until then the renamed messages show the new built-in text. A server whose language
-  files were never edited needs no action.
-- 语言键已从中文句子改为 ASCII 键（例如 `recipe.help.header`）。改过本模块 `lang/en.json` 或
-  `lang/zh.json` 的运维需要把改动重新套到新键上；在此之前，这些消息显示新的内置文本。从未改过语言文件的服务器无需任何操作。
+  If you customised this module's messages in your own language file -- a copy of an official file
+  whose name starts with that file's language code and a hyphen (for example `lang/zh-myserver.json`),
+  selected with `language: zh-myserver` in `plugins/UltiTools/config.yml` -- re-apply those edits to the new
+  keys; until then each renamed message shows the text of the official language the name starts with. A copy
+  whose name does not start with an official language code and a hyphen is still read, but every message
+  it lacks then shows in English, with one warning. An edit made directly in an official
+  language file (`lang/en.json`, `lang/zh.json`) is not kept: the framework restores the official files at
+  every start and on every module reload and keeps the edited file as `.bak` (UltiKits/UltiTools-Reborn#616). A server that never
+  customised messages needs no action.
+- 语言键已从中文句子改为 ASCII 键（例如 `recipe.help.header`）。如果你在自己的语言文件中自定义过本模块的消息——即把官方文件复制一份，文件名以该文件的语言代码加连字符开头
+  （例如 `lang/zh-myserver.json`），并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver` 选择它——请把改动重新套到新键上；
+  在此之前，改名的消息显示文件名开头那种官方语言的文本。文件名不以官方语言代码加连字符开头的副本仍会被读取，但其中缺少的消息
+  都显示英文，并记录一条警告。
+  直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动以及每次模块重载时恢复官方文件，并把修改过的文件
+  保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
 ### Removed
 
@@ -39,6 +49,64 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   否决，只是延后：由 UltiKits/UltiRecipe#23 跟踪**（UltiKits/UltiRecipe#13）。
 
 ### Fixed
+
+- UltiRecipe loads on UltiTools-API 6.3.0. That framework refuses at module load a configuration value
+  type it cannot store, and refused this module with `no config converter for
+  ...RecipeConfig$RecipeDefinition` (file `config/recipes.yml`, key `recipes`); the module now registers a
+  converter for its recipes. An existing `recipes.yml` loads with the same values and is not rewritten,
+  and a recipe that cannot be read is skipped with the same warning as before. Two values Bukkit's parser
+  used to drop without a word are now named: a recipe written with no value at all (`hollow:`) is skipped
+  with `Skipped recipe 'hollow': expected a mapping, found nothing`, and an ingredient written with no
+  material (`D:`) skips its recipe with `Skipped recipe '<name>': ingredients.D: has no value` (it used to
+  disappear, which refused the recipe as an invalid definition or, beside other ingredients, left its
+  shape letter empty). This version must be released together with UltiTools-API 6.3.0
+  (UltiKits/UltiRecipe#32).
+- UltiRecipe 可在 UltiTools-API 6.3.0 上加载。该框架在模块加载时拒绝它无法存储的配置值类型，此前会以
+  `no config converter for ...RecipeConfig$RecipeDefinition`（文件 `config/recipes.yml`，键 `recipes`）拒绝本模块；
+  现在本模块为配方注册了转换器。已有的 `recipes.yml` 读出的值不变，文件也不会被改写；读不成配方的条目仍以原来的警告跳过。
+  Bukkit 解析器以前会悄悄丢掉的两种写法现在会被点名：完全没有值的配方（`hollow:`）以
+  `Skipped recipe 'hollow': expected a mapping, found nothing` 跳过；没有写材料的配料（`D:`）以
+  `Skipped recipe '<名称>': ingredients.D: has no value` 跳过该配方（此前它会消失，配方要么被当成无效定义拒绝，要么在有其他配料时
+  让那个形状字母变成空格）。本版本必须与 UltiTools-API 6.3.0 一同发布（UltiKits/UltiRecipe#32）。
+
+- The comments above the two keys of `config/recipes.yml` (`enabled`, `recipes`) now come from the
+  module's language files: a server set to `language: en` writes English comments on a fresh install
+  (they were Chinese in every language). The comments the framework wrote on these two keys, the Chinese
+  ones earlier versions wrote included, switch to the server's language at the next start, and after you
+  change `language` and run a bare `/ul reload`; values are untouched, and a comment you wrote yourself is kept as
+  you wrote it (UltiKits/UltiTools-Reborn#611) (UltiKits/UltiRecipe#31).
+- `config/recipes.yml` 中两个配置项（`enabled`、`recipes`）上方的注释现在取自模块的语言文件：`language: en` 的服务器全新安装时
+  写入英文注释（此前所有语言下都是中文）。框架在这两项上写下的注释（包括旧版本写下的中文注释）会在下次启动时、以及你修改
+  `language` 并执行不带参数的 `/ul reload` 后切换为服务器语言；配置值不变，你自己写的注释保持原样（UltiKits/UltiTools-Reborn#611）
+  （UltiKits/UltiRecipe#31）。
+
+- `/ul reload UltiRecipe` no longer replies a plain success when `config/recipes.yml` cannot be read again.
+  An invalid or unreadable file is caught by the framework's own configuration reload, which runs before
+  this module's reload code (UltiKits/UltiTools-Reborn#589): the reply is `Module UltiRecipe failed to
+  reload: <cause>`, the cause naming `config/recipes.yml`, the console shows the framework's SEVERE line,
+  and the recipes loaded before stay registered. If a later re-read by the module itself fails, the module
+  records it in the framework's reload report, so the reply says the reload was partial and names the file
+  and the error (UltiKits/UltiRecipe#30).
+- 重新读取 `config/recipes.yml` 失败时，`/ul reload UltiRecipe` 不再一律回复成功。YAML 写错或文件不可读会在框架自己的配置重载中被发现，
+  它在本模块的重载代码之前执行（UltiKits/UltiTools-Reborn#589）：回复为 `Module UltiRecipe failed to reload: <原因>`，原因写明
+  `config/recipes.yml`，控制台显示框架的 SEVERE 行，之前加载的配方仍然有效。若之后本模块自己的再次读取失败，本模块会把它记进框架的
+  重载报告，回复会说明这次重载只完成了一部分，并写明文件和错误（UltiKits/UltiRecipe#30）。
+
+- `/recipe reload` no longer replies `Recipes reloaded!` when `config/recipes.yml` could not be read again
+  (an unreadable file, invalid YAML): it replies `Recipes reloaded only in part, <n> recipes total: <reason>`,
+  where the reason names the file and the error, and the recipes loaded before stay registered
+  (UltiKits/UltiRecipe#33).
+- 重新读取 `config/recipes.yml` 失败（文件不可读、YAML 写错）时，`/recipe reload` 不再回复「配方已重载！」，而是回复
+  `配方只重载了一部分，共 <n> 个配方：<原因>`，原因写明文件和错误；之前加载的配方仍然有效（UltiKits/UltiRecipe#33）。
+
+- A recipe in `config/recipes.yml` whose `shape` uses a letter with no entry under `ingredients` is no
+  longer registered, and a console warning names the recipe and the letter as written, for example
+  `Recipe 'sword' not registered: shape letter 'S' has no ingredient`; every such letter is named once.
+  The server used to turn that letter into an empty slot, so the recipe crafted from a pattern nobody
+  wrote (UltiKits/UltiRecipe#29).
+- `config/recipes.yml` 中 `shape` 用到了 `ingredients` 下没有的字母的配方不再注册，控制台警告会点名该配方和按原样书写的字母，例如
+  `Recipe 'sword' not registered: shape letter 'S' has no ingredient`；每个这样的字母只点名一次。此前服务器会把该字母当成空格，
+  配方变成按一个谁也没写过的图案合成（UltiKits/UltiRecipe#29）。
 
 - A fractional `output.amount` in `config/recipes.yml` (for example `2.5`) now refuses that recipe with a
   warning quoting the value as written: `Skipped recipe '<name>': output.amount: expected a whole number,

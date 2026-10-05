@@ -80,46 +80,9 @@ class UltiRecipeTest {
             verify(logger).info(contains("已禁用"));
         }
 
-        @Test
-        @DisplayName("onReload should reload recipes exactly once and log the returned count (UltiKits/UltiRecipe#11 Test B)")
-        void onReloadReloadsRecipesAndLogsCount() throws Exception {
-            UltiRecipe plugin = mock(UltiRecipe.class);
-            PluginLogger logger = mock(PluginLogger.class);
-            SimpleContainer context = mock(SimpleContainer.class);
-            RecipeService service = mock(RecipeService.class);
-
-            when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.getContext()).thenReturn(context);
-            when(context.getBean(RecipeService.class)).thenReturn(service);
-            when(service.reloadRecipes()).thenReturn(8);
-            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
-            doCallRealMethod().when(plugin).onReload();
-
-            plugin.onReload();
-
-            verify(service, times(1)).reloadRecipes();
-            verify(logger).info(contains("配方已重载"));
-            verify(logger).info(contains("8"));
-        }
-
-        @Test
-        @DisplayName("onReload should handle null RecipeService bean gracefully (UltiKits/UltiRecipe#11 Test C)")
-        void onReloadNullService() throws Exception {
-            UltiRecipe plugin = mock(UltiRecipe.class);
-            PluginLogger logger = mock(PluginLogger.class);
-            SimpleContainer context = mock(SimpleContainer.class);
-
-            when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.getContext()).thenReturn(context);
-            when(context.getBean(RecipeService.class)).thenReturn(null);
-            when(plugin.i18n(anyString())).thenAnswer(CatalogueText.answer("zh"));
-            doCallRealMethod().when(plugin).onReload();
-
-            // Should not throw exception
-            plugin.onReload();
-
-            verify(logger, never()).info(contains("配方已重载"));
-        }
+        // The reload hook's tests moved to UltiRecipePartialReloadTest, which calls it the way the
+        // framework does, onReload(ReloadReport), now that the module reports a failed re-read
+        // there (UltiKits/UltiRecipe#30).
     }
 
     @Nested

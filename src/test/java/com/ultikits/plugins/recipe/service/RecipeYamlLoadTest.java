@@ -1,17 +1,16 @@
 package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
+import com.ultikits.plugins.recipe.config.FrameworkRecipeConfig;
 import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.ultitools.annotations.ConfigEntry;
 import com.ultikits.ultitools.annotations.config.NotEmpty;
 import com.ultikits.ultitools.annotations.config.Range;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
-import com.ultikits.ultitools.interfaces.impl.pasers.DefaultConfigParser;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -42,21 +43,26 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Loading a real, non-empty {@code recipes.yml} (UltiKits/UltiRecipe#16).
+ * Loading a real, non-empty {@code recipes.yml} (UltiKits/UltiRecipe#16, UltiKits/UltiRecipe#32).
  *
- * <p>Every case here feeds {@code RecipeService} the value the FRAMEWORK actually produces for
- * the {@code recipes} key, by running the same two steps the framework runs:
- * {@code YamlConfiguration.loadFromString(...)} and then
- * {@link DefaultConfigParser#parse(Object)}. That parser turns every nested YAML mapping into a
- * {@code LinkedHashMap} and never into the declared {@code RecipeDefinition} value type, so the
- * declared {@code Map<String, RecipeDefinition>} field holds maps at runtime. This is the
- * distinction that matters: {@code RecipeServiceTest} builds its fixtures by calling
- * {@code new RecipeDefinition()} and the setters, which is a shape no server ever produces, and
- * that is why the whole class stayed green while no operator could load a single custom recipe.
+ * <p>Every case here feeds {@code RecipeService} the value the FRAMEWORK actually produces for the
+ * {@code recipes} key: it writes the YAML to a temporary {@code config/recipes.yml} and loads it with
+ * {@link FrameworkRecipeConfig}, which runs the framework's own module-load preparation (converter
+ * discovery and the declared-type check) and then {@code RecipeConfig#init}. On UltiTools-API 6.3.0 the
+ * declared {@code Map<String, RecipeDefinition>} is bound through the module's
+ * {@code RecipeDefinitionConverter}; before that converter existed the framework refused the module at
+ * load, so every case here failed in its fixture (UltiKits/UltiRecipe#32). {@code RecipeServiceTest}
+ * builds its fixtures by calling {@code new RecipeDefinition()} and the setters, which is a shape no
+ * server produces on its own - that is why this class exists beside it.
  *
- * <p>The class deliberately touches nothing but {@code RecipeService}'s own public surface, so it
- * compiles unchanged against the pre-fix sources and the revert proof's RED is a real test
- * failure rather than a compilation error.
+ * <p>Up to UltiTools-API 6.2 this class reproduced the 6.2 binder instead ({@code YamlConfiguration} and
+ * {@code DefaultConfigParser#parse}, which left every recipe a {@code LinkedHashMap}). The operator
+ * messages it asserts were captured against that binder and are unchanged: the converter carries a
+ * value it cannot read into the map as written, and {@code RecipeService} skips it with the same line.
+ *
+ * <p>The class deliberately touches nothing but {@code RecipeService}'s own public surface and the
+ * framework, so it compiles unchanged against the pre-fix sources and the revert proof's RED is a real
+ * test failure rather than a compilation error.
  *
  * <p>No Bukkit static is stubbed. {@code Material.matchMaterial} and {@code Bukkit.addRecipe} run
  * for real against the live test server {@link UltiRecipeTestHelper#setUp()} starts, and the
@@ -105,6 +111,9 @@ class RecipeYamlLoadTest {
 
     private RecipeService service;
     private RecipeConfig config;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -184,27 +193,18 @@ class RecipeYamlLoadTest {
     // --- fixtures -------------------------------------------------------------------------
 
     /**
-     * Binds a {@code recipes.yml} body the way the framework does, and hands the result to the
-     * config bean. The unchecked cast is the point of this class, not an oversight: it reproduces
-     * the heap pollution the framework's own binder creates on every server.
+     * Writes a {@code recipes.yml} body, loads it through the framework as a module start does, and hands
+     * the bound map to the config bean the service reads.
      */
-    @SuppressWarnings("unchecked")
     private void givenRecipesYml(String yml) throws Exception {
-        YamlConfiguration yaml = new YamlConfiguration();
-        yaml.loadFromString(yml);
-        Object raw = yaml.get("recipes");
-        Object parsed = raw == null
-                ? new LinkedHashMap<String, Object>()
-                : new DefaultConfigParser().parse(raw);
-        assertThat(parsed).as("the framework binds recipes to a plain Map, not to RecipeDefinition")
-                .isInstanceOf(Map.class);
-        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) parsed);
+        FrameworkRecipeConfig.write(tempDir, yml);
+        RecipeConfig loaded = FrameworkRecipeConfig.load(tempDir, "en");
+        when(config.getRecipes()).thenReturn(loaded.getRecipes());
     }
 
-    /** Hands the config bean a map built in code rather than parsed from YAML. */
-    @SuppressWarnings("unchecked")
-    private void givenRecipesMap(Map<String, ?> recipes) {
-        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) recipes);
+    /** Hands the config bean a map built in code rather than loaded from a file. */
+    private void givenRecipes(Map<String, RecipeConfig.RecipeDefinition> recipes) {
+        when(config.getRecipes()).thenReturn(recipes);
     }
 
     private List<String> warnings() {
@@ -395,35 +395,24 @@ class RecipeYamlLoadTest {
             assertThat(warnings()).containsExactly(expectedWarning);
         }
 
-        // The two cases below cannot be expressed as YAML, and that is a measured property of
-        // Bukkit's parser rather than an assumption: a mapping key whose value is empty
-        // (`hollow:`, `D:`) is DROPPED, so the key never reaches the binder at all. A list
-        // element that is empty is NOT dropped and arrives as null, which is why the empty
-        // shape row above is a YAML case and these two are not. Both branches are still
-        // reachable from a map built in code, so both are still the binder's business.
+        // The two cases below could not be written in YAML before 6.3.0: Bukkit's parser DROPPED a
+        // mapping key whose value is empty (`hollow:`, `D:`), so the key never reached the binder. The
+        // framework's own storage keeps such a key with a null value, so both are now operator cases,
+        // and both still report what the 6.2 binder reported for the same value built in code.
 
         @Test
-        @DisplayName("an entry with no value at all is skipped — YAML cannot produce this, code can")
-        void nullEntryIsSkipped() {
-            Map<String, Object> recipes = new LinkedHashMap<>();
-            recipes.put("hollow", null);
-            givenRecipesMap(recipes);
+        @DisplayName("an entry with no value at all (`hollow:`) is skipped, naming it")
+        void nullEntryIsSkipped() throws Exception {
+            givenRecipesYml("recipes:\n  hollow:\n");
 
             assertThat(service.initRecipes()).isZero();
             assertThat(warnings()).containsExactly("Skipped recipe 'hollow': expected a mapping, found nothing");
         }
 
         @Test
-        @DisplayName("an ingredient with no material is skipped — YAML cannot produce this, code can")
-        void nullIngredientValueIsSkipped() {
-            Map<String, Object> ingredients = new LinkedHashMap<>();
-            ingredients.put("D", null);
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("ingredients", ingredients);
-
-            Map<String, Object> recipes = new LinkedHashMap<>();
-            recipes.put("e", entry);
-            givenRecipesMap(recipes);
+        @DisplayName("an ingredient with no material (`D:`) is skipped, naming it")
+        void nullIngredientValueIsSkipped() throws Exception {
+            givenRecipesYml("recipes:\n  e:\n    ingredients:\n      D:\n");
 
             assertThat(service.initRecipes()).isZero();
             assertThat(warnings()).containsExactly("Skipped recipe 'e': ingredients.D: has no value");
@@ -460,10 +449,11 @@ class RecipeYamlLoadTest {
          * row may be restated from the other - two earlier revisions of this javadoc stated the
          * MockBukkit row as server behaviour.
          *
-         * <p>`registerRecipe` has always refused a definition whose output, shape or ingredients
-         * is null. The binder therefore hands it null when the operator supplied nothing; the
-         * field's own non-null default is not used for those cases, because that guard reads
-         * null and nothing else.
+         * <p>`registerRecipe` refuses a definition whose output (or the output's material), shape or
+         * ingredients is absent or empty, with the one line asserted below. Up to UltiTools-API 6.2 the
+         * binder turned each of those into null for that guard; since UltiKits/UltiRecipe#32 the
+         * converter keeps the value as written (so a recipe round-trips through the framework) and the
+         * guard reads "absent or empty" itself. The operator reads the same line either way.
          */
         private void assertRefusedWithoutRegistering(String key) {
             assertThat(service.initRecipes()).isZero();
@@ -490,8 +480,8 @@ class RecipeYamlLoadTest {
         }
 
         @Test
-        @DisplayName("`ingredients:` whose only entry has no material - Bukkit drops that key, leaving it empty")
-        void ingredientsPresentButEmptyAfterBukkitDropsTheKey() throws Exception {
+        @DisplayName("`ingredients:` with nothing under it")
+        void ingredientsKeyWithNoValue() throws Exception {
             givenRecipesYml(
                     "recipes:\n"
                     + "  hollow_ingredients:\n"
@@ -501,8 +491,7 @@ class RecipeYamlLoadTest {
                     + "      - \"DDD\"\n"
                     + "      - \"DDD\"\n"
                     + "      - \"DDD\"\n"
-                    + "    ingredients:\n"
-                    + "      D:\n");
+                    + "    ingredients:\n");
 
             assertRefusedWithoutRegistering("hollow_ingredients");
         }
@@ -784,8 +773,11 @@ class RecipeYamlLoadTest {
                     + "      DD: DIAMOND\n");
 
             assertThat(service.initRecipes()).isZero();
+            // Since UltiKits/UltiRecipe#29 the shape letter the unusable key left without an ingredient
+            // is named too, in the same pass.
             assertThat(warnings()).containsExactly(
-                    "Recipe 'wide_key' not registered: ingredient key 'DD' is not a single character");
+                    "Recipe 'wide_key' not registered: ingredient key 'DD' is not a single character",
+                    "Recipe 'wide_key' not registered: shape letter 'D' has no ingredient");
             assertThat(service.getRecipeList()).isEmpty();
         }
 
@@ -863,7 +855,7 @@ class RecipeYamlLoadTest {
     // --- values already in their declared shape still work --------------------------------
 
     @Nested
-    @DisplayName("a map already holding the declared types is still accepted")
+    @DisplayName("a map holding definitions built in code is accepted")
     class AlreadyBound {
 
         @Test
@@ -880,32 +872,10 @@ class RecipeYamlLoadTest {
 
             Map<String, RecipeConfig.RecipeDefinition> recipes = new LinkedHashMap<>();
             recipes.put("built", definition);
-            givenRecipesMap(recipes);
+            givenRecipes(recipes);
 
             assertThat(service.initRecipes()).isEqualTo(1);
             assertThat(service.getRecipeList()).containsExactly("built");
-        }
-
-        @Test
-        @DisplayName("an OutputItem built in code inside a parsed entry registers unchanged")
-        void builtOutputInsideAParsedEntryRegisters() throws Exception {
-            RecipeConfig.OutputItem output = new RecipeConfig.OutputItem();
-            output.setMaterial("DIAMOND");
-            output.setAmount(3);
-
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("output", output);
-            entry.put("shape", Arrays.asList("DDD", "DDD", "DDD"));
-            Map<String, String> ingredients = new LinkedHashMap<>();
-            ingredients.put("D", "DIAMOND");
-            entry.put("ingredients", ingredients);
-
-            Map<String, Object> recipes = new LinkedHashMap<>();
-            recipes.put("mixed", entry);
-            givenRecipesMap(recipes);
-
-            assertThat(service.initRecipes()).isEqualTo(1);
-            assertThat(registered("mixed").getResult().getAmount()).isEqualTo(3);
         }
     }
 
@@ -1197,6 +1167,78 @@ class RecipeYamlLoadTest {
             // the registry key is lower-cased, as every NamespacedKey is
             assertThat(service.getRecipeList()).containsExactly("custom_sword");
             assertThat(warnings()).anySatisfy(line -> assertThat(line).contains("disk gone"));
+        }
+    }
+
+    // --- UltiKits/UltiRecipe#29 ------------------------------------------------------------
+
+    /**
+     * A shape letter with no entry under {@code ingredients} keeps the recipe unregistered, and a warning
+     * names the recipe and the letter exactly as written (UltiKits/UltiRecipe#29, maintainer rule of
+     * 2026-09-27). Paper turns every shape character without an ingredient into an empty slot
+     * ({@code CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty}, measured for UltiKits/UltiRecipe#21),
+     * so registering it anyway made a recipe that crafts from a pattern the operator never wrote.
+     */
+    @Nested
+    @DisplayName("a shape letter with no ingredient keeps the recipe unregistered, naming the letter (UltiKits/UltiRecipe#29)")
+    class ShapeLetterWithoutIngredient {
+
+        private String entry(String name, String rows, String ingredients) {
+            String[] row = rows.split("\\|");
+            return "  " + name + ":\n"
+                    + "    output:\n"
+                    + "      material: DIAMOND\n"
+                    + "    shape:\n"
+                    + "      - \"" + row[0] + "\"\n"
+                    + "      - \"" + row[1] + "\"\n"
+                    + "      - \"" + row[2] + "\"\n"
+                    + "    ingredients:\n"
+                    + ingredients;
+        }
+
+        @Test
+        @DisplayName("S in the shape, no S under ingredients: not registered, S named; a good neighbour still registers")
+        void missingLetterIsRefused() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("missing_letter", "DSD|DSD|DSD", "      D: DIAMOND\n") + GOOD_ENTRY);
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'missing_letter' not registered: shape letter 'S' has no ingredient");
+            verify(UltiRecipeTestHelper.getMockLogger(), never()).info("Registered recipe: missing_letter");
+            assertThat(service.getRecipeList()).containsExactly("good");
+            assertThat(Bukkit.getRecipe(new NamespacedKey(UltiRecipeTestHelper.getMockJavaPlugin(),
+                    "ultirecipe_missing_letter"))).isNull();
+        }
+
+        @Test
+        @DisplayName("every missing letter is named once, in the order the shape first uses it")
+        void everyMissingLetterIsNamedOnce() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("two_missing", "ABA|CAC|ABA", "      A: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'two_missing' not registered: shape letter 'B' has no ingredient",
+                    "Recipe 'two_missing' not registered: shape letter 'C' has no ingredient");
+        }
+
+        @Test
+        @DisplayName("the letter is named exactly as written: a lower-case d is not the D under ingredients")
+        void letterIsNamedAsWritten() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("lower", "dDd|dDd|dDd", "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isZero();
+            assertThat(warnings()).containsExactly(
+                    "Recipe 'lower' not registered: shape letter 'd' has no ingredient");
+        }
+
+        @Test
+        @DisplayName("control: a space is an empty slot, not a letter, and every letter defined registers")
+        void spacesAreEmptySlots() throws Exception {
+            givenRecipesYml("recipes:\n" + entry("spaced", " D | D | D ", "      D: DIAMOND\n"));
+
+            assertThat(service.initRecipes()).isEqualTo(1);
+            assertThat(warnings()).isEmpty();
+            assertThat(registered("spaced").getResult().getType()).isEqualTo(Material.DIAMOND);
         }
     }
 

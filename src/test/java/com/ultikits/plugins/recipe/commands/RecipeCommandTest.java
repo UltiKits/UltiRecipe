@@ -2,7 +2,10 @@ package com.ultikits.plugins.recipe.commands;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
 import com.ultikits.plugins.recipe.i18n.CatalogueText;
+import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.plugins.recipe.service.RecipeService;
+import com.ultikits.ultitools.abstracts.ReloadReport;
+import com.ultikits.ultitools.exceptions.ConfigurationException;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -104,11 +107,11 @@ class RecipeCommandTest {
         @Test
         @DisplayName("Should reload recipes and display count")
         void reloadSuccess() {
-            when(service.reloadRecipes()).thenReturn(10);
+            when(service.reloadRecipes(any(ReloadReport.class))).thenReturn(10);
 
             command.reloadRecipes(sender);
 
-            verify(service).reloadRecipes();
+            verify(service).reloadRecipes(any(ReloadReport.class));
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(sender).sendMessage(captor.capture());
 
@@ -120,11 +123,11 @@ class RecipeCommandTest {
         @Test
         @DisplayName("Should handle zero recipes after reload")
         void reloadZero() {
-            when(service.reloadRecipes()).thenReturn(0);
+            when(service.reloadRecipes(any(ReloadReport.class))).thenReturn(0);
 
             command.reloadRecipes(sender);
 
-            verify(service).reloadRecipes();
+            verify(service).reloadRecipes(any(ReloadReport.class));
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(sender).sendMessage(captor.capture());
 
@@ -134,7 +137,7 @@ class RecipeCommandTest {
         @Test
         @DisplayName("Should handle large recipe count")
         void reloadLarge() {
-            when(service.reloadRecipes()).thenReturn(999);
+            when(service.reloadRecipes(any(ReloadReport.class))).thenReturn(999);
 
             command.reloadRecipes(sender);
 
@@ -142,6 +145,47 @@ class RecipeCommandTest {
             verify(sender).sendMessage(captor.capture());
 
             assertThat(captor.getValue()).contains("999");
+        }
+
+        /**
+         * UltiKits/UltiRecipe#33: a re-read of config/recipes.yml that failed is not a success. The reply
+         * says the reload was partial, gives the count still registered and the reason, in the sender's
+         * language, against the same contract as /ul reload (UltiKits/UltiRecipe#30).
+         */
+        @Test
+        @DisplayName("a failed re-read is replied as a partial reload with its reason, not as success (#33)")
+        void failedReReadIsRepliedAsPartial() {
+            when(service.reloadRecipes(any(ReloadReport.class))).thenAnswer(invocation -> {
+                invocation.getArgument(0, ReloadReport.class).partial("why it failed");
+                return 3;
+            });
+
+            command.reloadRecipes(sender);
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("why it failed").contains("3")
+                    .doesNotContain("配方已重载！");
+        }
+
+        @Test
+        @DisplayName("end to end: reload() throwing ConfigurationException gives the partial reply naming the file (#33)")
+        void configurationExceptionGivesThePartialReply() throws Exception {
+            RecipeService real = new RecipeService();
+            RecipeConfig config = UltiRecipeTestHelper.createDefaultConfig();
+            ConfigurationException failure = new ConfigurationException("Cannot load config/recipes.yml: AccessDeniedException");
+            doThrow(failure).when(config).reload();
+            UltiRecipeTestHelper.setField(real, "plugin", UltiRecipeTestHelper.getMockPlugin());
+            UltiRecipeTestHelper.setField(real, "config", config);
+            UltiRecipeTestHelper.setField(real, "pluginInstance", UltiRecipeTestHelper.getMockJavaPlugin());
+            UltiRecipeTestHelper.setField(command, "recipeService", real);
+
+            command.reloadRecipes(sender);
+
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(sender).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("config/recipes.yml").contains(failure.getMessage())
+                    .doesNotContain("配方已重载！");
         }
     }
 
@@ -326,7 +370,7 @@ class RecipeCommandTest {
         @DisplayName("Should handle multiple commands in sequence")
         void multipleCommands() {
             when(service.getRecipeList()).thenReturn(Arrays.asList("recipe1"));
-            when(service.reloadRecipes()).thenReturn(2);
+            when(service.reloadRecipes(any(ReloadReport.class))).thenReturn(2);
             when(service.getRecipeCount()).thenReturn(2);
 
             command.listRecipes(sender);
@@ -334,7 +378,7 @@ class RecipeCommandTest {
             command.showCount(sender);
 
             verify(service).getRecipeList();
-            verify(service).reloadRecipes();
+            verify(service).reloadRecipes(any(ReloadReport.class));
             verify(service).getRecipeCount();
             verify(sender, atLeast(3)).sendMessage(anyString());
         }
@@ -382,11 +426,11 @@ class RecipeCommandTest {
         @Test
         @DisplayName("reload should call reloadRecipes exactly once")
         void reloadCallsOnce() {
-            when(service.reloadRecipes()).thenReturn(0);
+            when(service.reloadRecipes(any(ReloadReport.class))).thenReturn(0);
 
             command.reloadRecipes(sender);
 
-            verify(service, times(1)).reloadRecipes();
+            verify(service, times(1)).reloadRecipes(any(ReloadReport.class));
         }
 
         @Test

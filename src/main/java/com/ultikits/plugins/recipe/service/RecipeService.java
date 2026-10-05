@@ -2,10 +2,12 @@ package com.ultikits.plugins.recipe.service;
 
 import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.plugins.recipe.config.RecipeProblem;
+import com.ultikits.ultitools.abstracts.ReloadReport;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.ConditionalOnConfig;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.exceptions.ConfigurationException;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -67,13 +69,6 @@ public class RecipeService {
         return plugin.getLogger();
     }
 
-    /** Why a recipe value could not be bound, in the server's language. */
-    private String reason(IllegalArgumentException e) {
-        return e instanceof RecipeProblem.RecipeBindingException
-                ? ((RecipeProblem.RecipeBindingException) e).getProblem().render(text)
-                : e.getMessage();
-    }
-
     /**
      * Get the plugin instance for NamespacedKey creation.
      * Uses Bukkit plugin manager lookup in production, can be overridden in tests.
@@ -94,12 +89,7 @@ public class RecipeService {
      * @return the number of recipes registered
      */
     public int initRecipes() {
-        // Read through a wildcard view. The declared value type is RecipeDefinition, but the
-        // framework's own binder (DefaultConfigParser#parse) fills this map with LinkedHashMaps,
-        // so reading a value back AS a RecipeDefinition compiles to a checkcast that throws
-        // ClassCastException for every non-empty recipes.yml (UltiKits/UltiRecipe#16). The
-        // wildcard keeps every value at Object until it is bound explicitly below.
-        Map<String, ?> recipes = config.getRecipes();
+        Map<String, RecipeConfig.RecipeDefinition> recipes = config.getRecipes();
 
         if (recipes == null || recipes.isEmpty()) {
             getLogger().info(plugin.i18n("recipe.log.none_configured"));
@@ -107,18 +97,18 @@ public class RecipeService {
         }
 
         int count = 0;
-        for (Map.Entry<String, ?> entry : recipes.entrySet()) {
+        for (Map.Entry<String, RecipeConfig.RecipeDefinition> entry : recipes.entrySet()) {
             String recipeName = entry.getKey();
+            RecipeConfig.RecipeDefinition definition = entry.getValue();
 
-            // Binding and registration are caught separately and on purpose: a value whose
-            // SHAPE is wrong never reaches registration, and a recipe that is shaped correctly
-            // but cannot be registered (an unusable name, for example) still reports through
-            // the message it always did.
-            RecipeConfig.RecipeDefinition definition;
-            try {
-                definition = RecipeConfig.RecipeDefinition.fromConfigValue(entry.getValue());
-            } catch (IllegalArgumentException e) {
-                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, reason(e)));
+            // A value that could not be read as a recipe never reaches registration, and is named with
+            // the line this module has always written for it (UltiKits/UltiRecipe#32: the converter
+            // keeps such a value in the map instead of letting the framework drop it unnamed). A recipe
+            // that reads correctly but cannot be registered (an unusable name, for example) still
+            // reports through the message it always did.
+            RecipeProblem unreadable = unreadable(definition);
+            if (unreadable != null) {
+                getLogger().warn(String.format(plugin.i18n("recipe.log.skipped"), recipeName, unreadable.render(text)));
                 continue;
             }
 
@@ -135,6 +125,32 @@ public class RecipeService {
     }
 
     /**
+     * Why a bound {@code recipes.<name>} value cannot be used as a recipe at all, or {@code null} when it
+     * can be judged as one.
+     * <p>
+     * Three cases, each reported with the reason the 6.2 binder gave for the same value: an entry written
+     * with no value ({@code hollow:}, which the framework keeps as {@code null}), a value the converter
+     * could not read ({@link RecipeConfig.UnreadableRecipe}), and an ingredient written with no material
+     * ({@code D:}), the first one in file order.
+     */
+    private static RecipeProblem unreadable(RecipeConfig.RecipeDefinition definition) {
+        if (definition == null) {
+            return RecipeProblem.entryWithNoValue();
+        }
+        if (definition instanceof RecipeConfig.UnreadableRecipe) {
+            return ((RecipeConfig.UnreadableRecipe) definition).getProblem();
+        }
+        if (definition.getIngredients() != null) {
+            for (Map.Entry<String, String> ingredient : definition.getIngredients().entrySet()) {
+                if (ingredient.getValue() == null) {
+                    return RecipeProblem.noValue("ingredients." + ingredient.getKey());
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Registers a single recipe.
      *
      * @param name       the recipe name
@@ -142,8 +158,10 @@ public class RecipeService {
      * @return true if registered successfully
      */
     private boolean registerRecipe(String name, RecipeConfig.RecipeDefinition definition) {
-        // Validate definition
-        if (definition.getOutput() == null || definition.getShape() == null || definition.getIngredients() == null) {
+        // Validate definition: every part present and non-empty, and an output that names a material.
+        // The converter keeps an absent part null and an empty one empty (UltiKits/UltiRecipe#32); the
+        // 6.2 binder turned both into null for this guard, so the operator reads the same line.
+        if (isAbsentOrEmpty(definition)) {
             getLogger().warn(String.format(plugin.i18n("recipe.log.invalid_definition"), name));
             return false;
         }
@@ -212,6 +230,20 @@ public class RecipeService {
 
             resolved.put(charKey.charAt(0), material);
         }
+        // Every shape letter needs an entry under ingredients. Paper turns a letter without one into an
+        // empty slot (CraftShapedRecipe#replaceUndefinedIngredientsWithEmpty), so registering it anyway
+        // made a recipe that crafts from a pattern the operator never wrote. Each missing letter is named
+        // once, as written, in the order the shape first uses it (UltiKits/UltiRecipe#29, maintainer
+        // rule of 2026-09-27); a space is an empty slot, not a letter.
+        Set<Character> named = new LinkedHashSet<>();
+        for (String row : shape) {
+            for (char letter : row.toCharArray()) {
+                if (letter != ' ' && !ingredients.containsKey(String.valueOf(letter)) && named.add(letter)) {
+                    getLogger().warn(String.format(plugin.i18n("recipe.log.refused_shape_letter"), name, letter));
+                    usable = false;
+                }
+            }
+        }
         if (!usable) {
             return false;
         }
@@ -225,6 +257,16 @@ public class RecipeService {
         
         getLogger().info(String.format(plugin.i18n("recipe.log.registered"), name));
         return true;
+    }
+
+    /**
+     * Whether a definition lacks a part a recipe needs: no output, an output with no material, or a shape
+     * or ingredient map that is absent or empty.
+     */
+    private static boolean isAbsentOrEmpty(RecipeConfig.RecipeDefinition definition) {
+        return definition.getOutput() == null || definition.getOutput().getMaterial() == null
+                || definition.getShape() == null || definition.getShape().isEmpty()
+                || definition.getIngredients() == null || definition.getIngredients().isEmpty();
     }
 
     /**
@@ -295,10 +337,30 @@ public class RecipeService {
      * @return the number of recipes registered after reload
      */
     public int reloadRecipes() {
+        return reloadRecipes(new ReloadReport());
+    }
+
+    /**
+     * Reloads all recipes as {@link #reloadRecipes()} does, and records in {@code report} what did not
+     * reload: a {@code config/recipes.yml} that could not be read again is recorded with
+     * {@link ReloadReport#partial(String)}, naming the file and the error, so {@code /ul reload UltiRecipe}
+     * replies that the reload was partial instead of a plain success (UltiKits/UltiRecipe#30, framework
+     * UltiTools-Reborn#529). The recipes loaded before are still registered again, as before.
+     * <p>
+     * Two failures count as "could not be read again": an {@code IOException}, and the
+     * {@code ConfigurationException} the framework throws for an unreadable or unparseable file once
+     * UltiTools-Reborn#589 is fixed, leaving the configuration as it was. Both are recorded the same way;
+     * neither fails the reload.
+     *
+     * @param report the report the framework handed to the module's reload hook
+     * @return the number of recipes registered after reload
+     */
+    public int reloadRecipes(ReloadReport report) {
         try {
             config.reload();
-        } catch (IOException e) {
+        } catch (IOException | ConfigurationException e) {
             getLogger().warn(String.format(plugin.i18n("recipe.log.config_reload_failed"), e.getMessage()));
+            report.partial(String.format(plugin.i18n("recipe.reload.partial_config"), e.getMessage()));
         }
         removeRecipes();
         return initRecipes();

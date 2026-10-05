@@ -1,6 +1,7 @@
 package com.ultikits.plugins.recipe;
 
 import com.ultikits.plugins.recipe.service.RecipeService;
+import com.ultikits.ultitools.abstracts.ReloadReport;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.UltiToolsModule;
 
@@ -47,12 +48,16 @@ public class UltiRecipe extends UltiToolsPlugin {
         getLogger().info(i18n("recipe.log.disabled"));
     }
 
+    /**
+     * Reloads the recipes after the framework's own reload steps. A {@code config/recipes.yml} that could
+     * not be read again is recorded in {@code report}, so {@code /ul reload UltiRecipe} replies that the
+     * reload was partial; the recipes loaded before stay registered (UltiKits/UltiRecipe#30).
+     */
     @Override
-    protected void onReload() {
-        // Reload recipes
+    protected void onReload(ReloadReport report) {
         RecipeService recipeService = getContext().getBean(RecipeService.class);
         if (recipeService != null) {
-            int count = recipeService.reloadRecipes();
+            int count = recipeService.reloadRecipes(report);
             getLogger().info(String.format(i18n("recipe.log.reloaded_count"), count));
         }
     }

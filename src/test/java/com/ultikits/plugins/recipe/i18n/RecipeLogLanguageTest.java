@@ -1,20 +1,20 @@
 package com.ultikits.plugins.recipe.i18n;
 
 import com.ultikits.plugins.recipe.UltiRecipeTestHelper;
+import com.ultikits.plugins.recipe.config.FrameworkRecipeConfig;
 import com.ultikits.plugins.recipe.config.RecipeConfig;
 import com.ultikits.plugins.recipe.service.RecipeService;
 import com.ultikits.ultitools.interfaces.impl.logger.PluginLogger;
-import com.ultikits.ultitools.interfaces.impl.pasers.DefaultConfigParser;
 
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
+import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +38,9 @@ class RecipeLogLanguageTest {
     private RecipeService service;
     private RecipeConfig config;
     private PluginLogger logger;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -65,13 +68,11 @@ class RecipeLogLanguageTest {
         return text == null ? "<lang/zh.json has no " + key + ">" : String.format(text, args);
     }
 
-    @SuppressWarnings("unchecked")
+    /** Loads a {@code recipes.yml} body through the framework, as a module start does (UltiKits/UltiRecipe#32). */
     private void givenRecipesYml(String yml) throws Exception {
-        YamlConfiguration yaml = new YamlConfiguration();
-        yaml.loadFromString(yml);
-        Object raw = yaml.get("recipes");
-        Object parsed = raw == null ? new LinkedHashMap<String, Object>() : new DefaultConfigParser().parse(raw);
-        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) parsed);
+        FrameworkRecipeConfig.write(tempDir, yml);
+        RecipeConfig loaded = FrameworkRecipeConfig.load(tempDir, "zh");
+        when(config.getRecipes()).thenReturn(loaded.getRecipes());
     }
 
     private static String recipe(String name, String material, String amount, String... shapeAndIngredients) {
@@ -172,17 +173,9 @@ class RecipeLogLanguageTest {
     }
 
     @Test
-    @DisplayName("an empty entry and an ingredient with no value (Bukkit's YAML drops both; a map built in code does not)")
-    @SuppressWarnings("unchecked")
-    void reasonsYamlCannotProduce() {
-        Map<String, Object> ingredients = new LinkedHashMap<>();
-        ingredients.put("D", null);
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("ingredients", ingredients);
-        Map<String, Object> recipes = new LinkedHashMap<>();
-        recipes.put("f", entry);
-        recipes.put("l", null);
-        when(config.getRecipes()).thenReturn((Map<String, RecipeConfig.RecipeDefinition>) (Map<String, ?>) recipes);
+    @DisplayName("an empty entry and an ingredient with no value (Bukkit's YAML dropped both; the 6.3.0 storage keeps them)")
+    void reasonsForEmptyValues() throws Exception {
+        givenRecipesYml("recipes:\n  f:\n    ingredients:\n      D:\n  l:\n");
         service.initRecipes();
         assertThat(warnings()).containsExactly(
                 zh("recipe.log.skipped", "f", zh("recipe.reason.no_value", "ingredients.D")),
@@ -224,6 +217,15 @@ class RecipeLogLanguageTest {
         assertThat(warnings()).containsExactlyInAnyOrder(
                 zh("recipe.log.refused_ingredient_key", "odd", "xx"),
                 zh("recipe.log.refused_ingredient_material", "odd", "Q", "NOPE_NOT_REAL"));
+    }
+
+    @Test
+    @DisplayName("a shape letter with no ingredient (UltiKits/UltiRecipe#29)")
+    void shapeLetterWithoutIngredient() throws Exception {
+        givenRecipesYml(recipe("no_s", "DIAMOND", null, "    shape:", "      - \"DSD\"", "      - \"DSD\"",
+                "      - \"DSD\"", "    ingredients:", "      D: DIAMOND"));
+        service.initRecipes();
+        assertThat(warnings()).containsExactly(zh("recipe.log.refused_shape_letter", "no_s", "S"));
     }
 
     @Test

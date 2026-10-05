@@ -45,6 +45,26 @@ public final class RecipeProblem {
         return new RecipeProblem(kind, args);
     }
 
+    /**
+     * Why a {@code recipes.<name>} entry written with no value at all ({@code hollow:}) is skipped: the
+     * framework keeps such an entry with a {@code null} value and never hands it to the converter.
+     *
+     * @return the reason, as the 6.2 binder reported it
+     */
+    public static RecipeProblem entryWithNoValue() {
+        return of(Kind.ENTRY_EXPECTED_MAPPING, found(null));
+    }
+
+    /**
+     * Why a sub-key written with no value ({@code D:} under {@code ingredients}) is skipped.
+     *
+     * @param path the sub-key as the operator reads it, for example {@code ingredients.D}
+     * @return the reason, as the 6.2 binder reported it
+     */
+    public static RecipeProblem noValue(String path) {
+        return of(Kind.NO_VALUE, path);
+    }
+
     /** Describes a value found where a different shape was expected. */
     static RecipeProblem found(Object value) {
         if (value == null) {
