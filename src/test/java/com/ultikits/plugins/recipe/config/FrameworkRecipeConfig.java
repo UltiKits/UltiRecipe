@@ -64,8 +64,13 @@ public final class FrameworkRecipeConfig {
      * real one for {@code language}.
      */
     public static UltiToolsPlugin plugin(final Path dir, final String language) {
-        return Mockito.mock(UltiToolsPlugin.class, invocation -> {
+        // The module's own class, so the framework's real shippedCatalogueTexts reads this module's catalogues from
+        // its code source and recognises a comment it wrote in either language as its own (framework #604, PR #611).
+        return Mockito.mock(com.ultikits.plugins.recipe.UltiRecipe.class, invocation -> {
             String name = invocation.getMethod().getName();
+            if ("shippedCatalogueTexts".equals(name)) {
+                return invocation.callRealMethod();
+            }
             if ("getConfigFolder".equals(name)) {
                 return dir.toString();
             }
