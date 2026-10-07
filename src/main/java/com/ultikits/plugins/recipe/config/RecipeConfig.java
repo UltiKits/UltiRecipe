@@ -206,7 +206,7 @@ public class RecipeConfig extends AbstractConfigEntity {
          * either annotation needs no change here. The other two annotations in that package,
          * {@code @Size} and {@code @Pattern}, are not read, because no field on this class
          * declares one - and that is not left to a promise: {@code RecipeYamlLoadTest}'s
-         * {@code onlyTheConstraintsThisModuleReadsAreDeclared} fails the moment a field declares
+         * {@code NestedOutputConstraints#everyDeclaredConstraintIsReadBySomething} fails the moment a field declares
          * a constraint this method does not read, which is the same silent-no-op defect one
          * level up.
          * <p>
