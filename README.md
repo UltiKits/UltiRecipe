@@ -2,9 +2,9 @@
 
 **Minecraft 服务器自定义配方插件** - 通过 YAML 配置轻松创建自定义合成配方，无需编写代码。
 
-[![Java](https://img.shields.io/badge/Java-8+-orange.svg)](https://www.oracle.com/java/)
-[![Spigot](https://img.shields.io/badge/Spigot-1.13--1.21-yellow.svg)](https://www.spigotmc.org/)
-[![UltiTools](https://img.shields.io/badge/UltiTools-6.2.0+-blue.svg)](https://github.com/UltiKits/UltiTools-Reborn)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://adoptium.net/)
+[![Paper](https://img.shields.io/badge/Paper-1.21%2B-green.svg)](https://papermc.io/)
+[![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.3.0%2B-blue.svg)](https://github.com/UltiKits/UltiTools-Reborn)
 
 ## ✨ 功能特性
 
@@ -24,13 +24,14 @@
 
 ### 🔒 兼容性
 
-- **UltiTools 生态** - 完美集成 UltiTools-API 6.2.0+ 框架
-- **版本支持** - 支持 Minecraft 1.13 - 1.21 所有版本
+- **UltiTools 生态** - 完美集成 UltiTools-API 6.3.0+ 框架
+- **版本支持** - 仅支持 Paper 1.21 及以上、Java 21 及以上，与其所依赖的 UltiTools 框架一致
 - **原版材料** - 支持所有 Minecraft 原版材料作为配方材料
 
 ## 📦 安装
 
-1. 确保已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.2.0 或更高版本
+1. 确保已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.3.0 或更高版本。本模块声明 `api-version: 630`，
+   更早的框架会拒绝加载它
 2. 下载最新版本的 UltiRecipe
 3. 将 JAR 文件放入 `plugins/UltiTools/plugins/` 目录
 4. 重启服务器或执行 `/ul reload`
