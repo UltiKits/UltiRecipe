@@ -9,6 +9,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- This version requires UltiTools 6.3.0 or later and declares `api-version: 630` in `plugin.yml`
+  (it was `620`). The module already relied on the reload and unload hooks UltiTools 6.3.0 introduced;
+  an older framework never calls them, so `/ul reload` did not re-read the recipes and unloading the
+  module left them registered, with no error. An older framework now refuses to load the module and logs
+  a warning instead. The README's framework minimum and its server and Java badges now say
+  UltiTools 6.3.0+, Paper 1.21+ and Java 21+ (UltiKits/UltiRecipe#19, UltiKits/UltiTools-Reborn#544).
+- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（原为 `620`）。本模块已依赖
+  UltiTools 6.3.0 引入的重载与卸载钩子；更早的框架从不调用它们，因此 `/ul reload` 不会重新读取配方，卸载模块后配方也仍然
+  保留，且没有任何报错。现在更早的框架会拒绝加载本模块并记录一条警告。README 中的框架最低版本以及服务端与 Java
+  徽章已改为 UltiTools 6.3.0+、Paper 1.21+、Java 21+（UltiKits/UltiRecipe#19、UltiKits/UltiTools-Reborn#544）。
+
+- `plugin.yml` now declares `identify-string: ultirecipe`, the key of this module's entry in the
+  UltiCloud catalogue. The framework's update check and `/upm update` skip a module that does not
+  declare it, so this module now takes part in both: a later published version carrying the same key
+  is reported at startup and can be installed with `/upm update` (UltiKits/UltiTools-Reborn#474).
+- `plugin.yml` 现在声明 `identify-string: ultirecipe`，即本模块在 UltiCloud 模块目录中的条目键。框架的更新检查和
+  `/upm update` 会跳过未声明该键的模块，因此本模块现在会参与两者：带有同一键的更高发布版本会在启动时提示，
+  并可用 `/upm update` 安装（UltiKits/UltiTools-Reborn#474）。
+
 - `/recipe` deliberately takes over the vanilla `/recipe` command of the same name, as the maintainer
   decided; this is now stated in the documentation. The vanilla command stays reachable as
   `minecraft:recipe` (UltiKits/UltiRecipe#27).

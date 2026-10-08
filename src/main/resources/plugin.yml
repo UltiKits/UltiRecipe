@@ -4,5 +4,6 @@ main: com.ultikits.plugins.recipe.UltiRecipe
 authors:
   - wisdommen
   - UltiKits Team
-api-version: 620
+api-version: 630
+identify-string: ultirecipe
 loadAfter: []
