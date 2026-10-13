@@ -62,6 +62,12 @@ for real-machine verification, not user-facing documentation.
   processing; this module's own `lang/en.json`/`lang/zh.json` contain no doubled single-quotes,
   so this note (carried from the framework's and UltiChat's own checklists for template
   consistency) has no live instance in this document.
+- **Console lines carry the module-logger prefix.** Every line this module logs reaches the console as
+  `[UltiTools] [UltiRecipe] <text>`: Paper adds `[UltiTools] `, and the framework's module logger (`PluginLogger`)
+  adds `[UltiRecipe] ` (this module's `plugin.yml` `name`). A console line quoted below is the `<text>` after both
+  prefixes, character for character, unless the row quotes a prefix itself; a row that counts or excludes this
+  module's console lines means lines carrying `[UltiRecipe]`. A line the framework logs is quoted after Paper's
+  prefix, with its own `[UltiTools-API] ` where the row shows it.
 
 ## Recipe Management
 
