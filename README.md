@@ -31,8 +31,8 @@
    更早的框架会拒绝加载它
 2. 下载最新版本的 UltiRecipe
 3. 将 JAR 文件放入 `plugins/UltiTools/plugins/` 目录
-4. 重启服务器或执行 `/ul reload`
-5. 编辑 `plugins/UltiTools/UltiRecipe/config/recipes.yml` 添加自定义配方
+4. 重启服务器（`/ul reload` 只重载配置，不会加载新的模块 JAR）
+5. 编辑 `plugins/UltiTools/pluginConfig/UltiRecipe/config/recipes.yml` 添加自定义配方
 
 ## 🎮 命令
 
@@ -53,7 +53,7 @@
 
 ### 配置文件结构
 
-配置文件位于 `plugins/UltiTools/UltiRecipe/config/recipes.yml`：
+配置文件位于 `plugins/UltiTools/pluginConfig/UltiRecipe/config/recipes.yml`：
 
 ```yaml
 enabled: true  # 是否启用自定义配方
