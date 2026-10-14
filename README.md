@@ -2,8 +2,6 @@
 
 **Minecraft 服务器自定义配方插件** - 通过 YAML 配置轻松创建自定义合成配方，无需编写代码。
 
-[![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://adoptium.net/)
-[![Paper](https://img.shields.io/badge/Paper-1.21%2B-green.svg)](https://papermc.io/)
 [![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.3.0%2B-blue.svg)](https://github.com/UltiKits/UltiTools-Reborn)
 
 ## ✨ 功能特性
@@ -25,7 +23,6 @@
 ### 🔒 兼容性
 
 - **UltiTools 生态** - 完美集成 UltiTools-API 6.3.0+ 框架
-- **版本支持** - 仅支持 Paper 1.21 及以上、Java 21 及以上，与其所依赖的 UltiTools 框架一致
 - **原版材料** - 支持所有 Minecraft 原版材料作为配方材料
 
 ## 📦 安装
