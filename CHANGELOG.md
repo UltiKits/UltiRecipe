@@ -5,27 +5,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
-## [Unreleased]
+## [2.0.0] - 2026-10-21
 
 ### Changed
 
 - This version requires UltiTools 6.3.0 or later and declares `api-version: 630` in `plugin.yml`
-  (it was `620`). The module already needed 6.3.0: on UltiTools 6.2.5 the old declaration let its own
+  (the released 1.0.0 declared `620`). The module already needed 6.3.0: on UltiTools 6.2.5 the old declaration let its own
   start-up run (the console printed `UltiRecipe enabled!`) and the load then failed with a
   `NoClassDefFoundError` for a 6.3.0 class. An older framework now refuses the module before its start-up
   runs, with the warning `[UltiTools-API] UltiRecipe load failed！UltiTools version is outdated！`.
   UltiTools 6.2.5 still prints a `NoClassDefFoundError` stack trace for
   `com/ultikits/ultitools/config/convert/ConfigConverter` just before that warning, because it reads the
   module's configuration classes before it checks the version; the warning is the line that names the
-  cause. The README's framework minimum and its server and Java badges now say UltiTools 6.3.0+,
-  Paper 1.21+ and Java 21+ (UltiKits/UltiRecipe#19, UltiKits/UltiTools-Reborn#544).
-- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（原为 `620`）。本模块此前就已需要
+  cause (UltiKits/UltiRecipe#19).
+- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（已发布的 1.0.0 声明为 `620`）。本模块此前就已需要
   6.3.0：在 UltiTools 6.2.5 上，旧的声明会让模块自身的启动逻辑先运行（控制台打印 `UltiRecipe enabled!`），随后因缺少
   6.3.0 的类而以 `NoClassDefFoundError` 加载失败。现在更早的框架会在模块的启动逻辑运行之前拒绝加载它，并给出警告
   `[UltiTools-API] UltiRecipe load failed！UltiTools version is outdated！`。UltiTools 6.2.5 在这条警告之前仍会打印一段
   `com/ultikits/ultitools/config/convert/ConfigConverter` 的 `NoClassDefFoundError` 堆栈，因为它在检查版本之前就读取
-  模块的配置类；指明原因的是那条警告。README 中的框架最低版本以及服务端与 Java 徽章已改为 UltiTools 6.3.0+、
-  Paper 1.21+、Java 21+（UltiKits/UltiRecipe#19、UltiKits/UltiTools-Reborn#544）。
+  模块的配置类；指明原因的是那条警告（UltiKits/UltiRecipe#19）。
 
 - `plugin.yml` now declares `identify-string: ultirecipe`, the key of this module's entry in the
   UltiCloud catalogue. The framework's update check and `/upm update` skip a module that does not
@@ -58,22 +56,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   直接在官方语言文件（`lang/en.json`、`lang/zh.json`）中做的修改不会保留：框架会在每次启动以及每次模块重载时恢复官方文件，并把修改过的文件
   保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。从未自定义过消息的服务器无需任何操作。
 
-### Removed
-
-- `RecipeConfig#initDefaults()`, which claimed in its own javadoc to be "called by the framework
-  after instantiation" and to seed an example `golden_egg` recipe on first run. Nothing ever called
-  it, so no install has ever received that example; the claim is gone rather than the behaviour. A
-  fresh install still writes `config/recipes.yml` with `enabled: true` and an empty `recipes: {}`
-  map, exactly as before — nothing an operator can observe changes. The README bullet that promised
-  an auto-generated example configuration was reworded to say the same thing. **Shipping an example
-  recipe on first run is not rejected, only deferred: it is tracked as UltiKits/UltiRecipe#23**
-  (UltiKits/UltiRecipe#13).
-- `RecipeConfig#initDefaults()` 已删除。该方法的 javadoc 自称「由框架在实例化后调用」并会在首次运行时写入一条
-  `golden_egg` 示例配方，但从未有任何代码调用它，因此没有任何一次安装真正拿到过这条示例；这里删掉的是那句假声明，
-  不是行为。全新安装写出的 `config/recipes.yml` 仍然是 `enabled: true` 加一个空的 `recipes: {}`，与此前完全一致，
-  运维看不到任何差别。README 中「自动生成示例配置」那一条也改为与实际一致的说法。**「随插件附带一份示例配方」并未被
-  否决，只是延后：由 UltiKits/UltiRecipe#23 跟踪**（UltiKits/UltiRecipe#13）。
-
 ### Fixed
 
 - UltiRecipe loads on UltiTools-API 6.3.0. That framework refuses at module load a configuration value
@@ -85,15 +67,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   with `Skipped recipe 'hollow': expected a mapping, found nothing`, and an ingredient written with no
   material (`D:`) skips its recipe with `Skipped recipe '<name>': ingredients.D: has no value` (it used to
   disappear, which refused the recipe as an invalid definition or, beside other ingredients, left its
-  shape letter empty). This version must be released together with UltiTools-API 6.3.0
-  (UltiKits/UltiRecipe#32).
+  shape letter empty) (UltiKits/UltiRecipe#32).
 - UltiRecipe 可在 UltiTools-API 6.3.0 上加载。该框架在模块加载时拒绝它无法存储的配置值类型，此前会以
   `no config converter for ...RecipeConfig$RecipeDefinition`（文件 `config/recipes.yml`，键 `recipes`）拒绝本模块；
   现在本模块为配方注册了转换器。已有的 `recipes.yml` 读出的值不变，文件也不会被改写；读不成配方的条目仍以原来的警告跳过。
   Bukkit 解析器以前会悄悄丢掉的两种写法现在会被点名：完全没有值的配方（`hollow:`）以
   `Skipped recipe 'hollow': expected a mapping, found nothing` 跳过；没有写材料的配料（`D:`）以
   `Skipped recipe '<名称>': ingredients.D: has no value` 跳过该配方（此前它会消失，配方要么被当成无效定义拒绝，要么在有其他配料时
-  让那个形状字母变成空格）。本版本必须与 UltiTools-API 6.3.0 一同发布（UltiKits/UltiRecipe#32）。
+  让那个形状字母变成空格）（UltiKits/UltiRecipe#32）。
 
 - The comments above the two keys of `config/recipes.yml` (`enabled`, `recipes`) now come from the
   module's language files: a server set to `language: en` writes English comments on a fresh install
