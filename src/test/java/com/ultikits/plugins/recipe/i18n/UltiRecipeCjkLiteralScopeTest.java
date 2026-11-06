@@ -45,8 +45,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@code {key}} token that the module's catalogues translate (UltiKits/UltiRecipe#31), so a new
  * Chinese-only comment fails this guard.
  * <p>
- * This file is the same in every module except for its package line and class name, and this one
- * deliberate difference: the modules that did not adopt translatable config comments keep a skip for
+ * Module guards are maintained separately; shared character properties do not imply byte-identical copies.
+ * One module-specific difference: the modules that did not adopt translatable config comments keep a skip for
  * the {@code comment} element of {@code @ConfigEntry}; the modules that adopted them (UltiRemoteBag,
  * UltiSideBar, UltiRecipe and the others of that adoption) do not.
  */
