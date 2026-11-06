@@ -18,12 +18,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `com/ultikits/ultitools/config/convert/ConfigConverter` just before that warning, because it reads the
   module's configuration classes before it checks the version; the warning is the line that names the
   cause (UltiKits/UltiRecipe#19).
+  Upgrade UltiTools to 6.3.0 before replacing this module's JAR.
 - 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（已发布的 1.0.0 声明为 `620`）。本模块此前就已需要
   6.3.0：在 UltiTools 6.2.5 上，旧的声明会让模块自身的启动逻辑先运行（控制台打印 `UltiRecipe enabled!`），随后因缺少
   6.3.0 的类而以 `NoClassDefFoundError` 加载失败。现在更早的框架会在模块的启动逻辑运行之前拒绝加载它，并给出警告
   `[UltiTools-API] UltiRecipe load failed！UltiTools version is outdated！`。UltiTools 6.2.5 在这条警告之前仍会打印一段
   `com/ultikits/ultitools/config/convert/ConfigConverter` 的 `NoClassDefFoundError` 堆栈，因为它在检查版本之前就读取
   模块的配置类；指明原因的是那条警告（UltiKits/UltiRecipe#19）。
+  更换模块 JAR 前请先将 UltiTools 升级到 6.3.0。
 
 - `plugin.yml` now declares `identify-string: ultirecipe`, the key of this module's entry in the
   UltiCloud catalogue. The framework's update check and `/upm update` skip a module that does not
