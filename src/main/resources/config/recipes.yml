@@ -1,0 +1,23 @@
+enabled: true
+recipes: {}
+
+# Optional example: nothing is craftable until you enable a recipe yourself.
+# To try it, replace "recipes: {}" above with the entire block below,
+# removing the leading "# " from each line. Keep only ONE top-level recipes key.
+# Then run /recipe reload (or restart the server).
+# Five apples and three dark oak wood blocks produce one ordinary egg.
+# No custom name or lore is set: the item uses the player's client language.
+# You can add output.name and output.lore for your own custom item text.
+# Existing recipes.yml files are kept, never replaced with this template.
+# recipes:
+#   example_egg:
+#     output:
+#       material: EGG
+#       amount: 1
+#     shape:
+#       - "AAA"
+#       - "AWA"
+#       - "W W"
+#     ingredients:
+#       A: APPLE
+#       W: DARK_OAK_WOOD
