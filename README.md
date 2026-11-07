@@ -16,9 +16,10 @@
 ### 🚀 易用性
 - **热重载** - 使用 `/recipe reload` 无需重启服务器即可重载配方
 - **配方列表** - 使用 `/recipe list` 查看所有已注册的配方
-- **即插即用** - 放入插件文件夹，自动生成配置文件（`enabled: true`、`recipes: {}`）。首次启动**不会**生成示例配方：
-  下文的 `golden_egg`、`custom_sword` 等都是配方写法示例，需要自行写入 `recipes.yml`
-  （「随插件附带一份示例配方」由 UltiKits/UltiRecipe#23 跟踪）
+- **First-run example** - A fresh `config/recipes.yml` includes a complete, commented-out `example_egg`
+  recipe to copy or edit. The effective defaults stay `enabled: true`, `recipes: {}`: no custom recipe
+  is craftable until you opt in. Existing configuration files are never replaced with the template.
+  **首启示例** - 首次生成的配置附带注释形式的 `example_egg` 示例；默认不注册任何配方，不覆盖已有配置。
 
 ### 🔒 兼容性
 
@@ -87,7 +88,26 @@ recipes:
 - 空格 ` ` 表示该位置不需要放置物品
 - 其他字符在 `ingredients` 中定义对应的材料；形状里用到、却没有在 `ingredients` 中定义的字母会让该配方不注册，控制台警告会点名配方和这个字母（Every other character must be defined under `ingredients`; a shape letter with no entry there keeps the recipe unregistered, and a console warning names the recipe and the letter.）
 
+### First-run example / 首启示例
+
+A new `config/recipes.yml` contains an optional `example_egg` recipe in comments. Replace
+`recipes: {}` with the entire commented `recipes:` block, removing the leading `# ` from each
+line; keep only one top-level `recipes` key. Run `/recipe reload` to activate it. Its three rows
+are `AAA`, `AWA`, `W W`: `A` is `APPLE`, `W` is `DARK_OAK_WOOD`, and the result is one ordinary
+`EGG`. No custom name or lore is set, so the item's name follows the player's client language.
+Remove the entry (or set `recipes: {}`) and reload to disable it again. The file's instructional
+comments are English; the framework still localizes the comments directly above `enabled` and
+`recipes`. Existing installations keep their file, including an intentionally empty recipe map;
+they can copy the template from `src/main/resources/config/recipes.yml` instead.
+
+首次生成的文件包含注释形式的示例。用去掉每行开头 `# ` 的完整 `recipes:` 示例块替换
+`recipes: {}`（不要重复保留两个 `recipes` 键），执行 `/recipe reload` 后才可合成。
+五个苹果与三个深色橡木方块产出一个普通鸡蛋，不附带固定语言的名称或描述。
+删除该条目并重载即可停用；已有配置不会自动补入或覆盖，可从仓库资源文件复制示例。
+
 ### 示例配方
+
+The following recipes are additional documentation examples, not automatically enabled content.
 
 **钻石剑配方：**
 ```yaml
