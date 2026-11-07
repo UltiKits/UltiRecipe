@@ -178,7 +178,7 @@ UltiRecipe/
 
 ## 📄 许可证
 
-本项目是 UltiKits 生态系统的一部分，遵循 MIT 许可证。
+本项目是 UltiKits 生态系统的一部分，遵循 [MIT 许可证](LICENSE)。
 
 ## 🤝 贡献
 
