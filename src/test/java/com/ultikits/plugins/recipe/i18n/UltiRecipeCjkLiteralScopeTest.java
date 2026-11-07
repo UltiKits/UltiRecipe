@@ -27,7 +27,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>
  * Detection contract: this guard and the framework's {@code .github/scripts/check-cjk-scope.sh} detect the same character
  * properties: the Han script, CJK Symbols and Punctuation (U+3000-U+303F) and Halfwidth and Fullwidth Forms
- * (U+FF00-U+FFEF); kana is out ({@link I18nSourceScanner#containsCjk}). The Unicode version each one knows follows its
+ * (U+FF00-U+FFEF); Hiragana U+3040-U+309F and Katakana U+30A0-U+30FF are excluded
+ * ({@link I18nSourceScanner#containsCjk}). Halfwidth punctuation U+FF61-U+FF64 and halfwidth katakana
+ * U+FF65-U+FF9F are included by the forms range. The Unicode version each one knows follows its
  * toolchain -- the JDK here, PCRE2 on the CI runner -- so a character added in a newer Unicode version can be matched by
  * one and not yet by the other. Unlike that script, this guard is about literals, not comments: comments never count, and
  * every string, character and text-block literal counts after its Unicode and escape sequences are decoded. The literals
@@ -43,8 +45,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@code {key}} token that the module's catalogues translate (UltiKits/UltiRecipe#31), so a new
  * Chinese-only comment fails this guard.
  * <p>
- * This file is the same in every module except for its package line and class name, and this one
- * deliberate difference: the modules that did not adopt translatable config comments keep a skip for
+ * Module guards are maintained separately; shared character properties do not imply byte-identical copies.
+ * One module-specific difference: the modules that did not adopt translatable config comments keep a skip for
  * the {@code comment} element of {@code @ConfigEntry}; the modules that adopted them (UltiRemoteBag,
  * UltiSideBar, UltiRecipe and the others of that adoption) do not.
  */
