@@ -98,12 +98,13 @@ are `AAA`, `AWA`, `W W`: `A` is `APPLE`, `W` is `DARK_OAK_WOOD`, and the result 
 Remove the entry (or set `recipes: {}`) and reload to disable it again. The file's instructional
 comments are English; the framework still localizes the comments directly above `enabled` and
 `recipes`. Existing installations keep their file, including an intentionally empty recipe map;
-they can copy the template from `src/main/resources/config/recipes.yml` instead.
+they can copy the template from `config/recipes.yml` inside the module JAR instead
+(for example `unzip -p UltiRecipe-<version>.jar config/recipes.yml`, or open the JAR with any ZIP tool).
 
 首次生成的文件包含注释形式的示例。用去掉每行开头 `# ` 的完整 `recipes:` 示例块替换
 `recipes: {}`（不要重复保留两个 `recipes` 键），执行 `/recipe reload` 后才可合成。
 五个苹果与三个深色橡木方块产出一个普通鸡蛋，不附带固定语言的名称或描述。
-删除该条目并重载即可停用；已有配置不会自动补入或覆盖，可从仓库资源文件复制示例。
+删除该条目并重载即可停用；已有配置不会自动补入或覆盖，可从模块 JAR 内的 `config/recipes.yml` 复制示例（JAR 可用任意 ZIP 工具打开）。
 
 ### 示例配方
 
